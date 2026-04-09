@@ -1,69 +1,5 @@
-================================================================================
-PIXELVAULT — BUILDER'S HANDBOOK
-How teammates complete the frontend using AI, building on top of the
-foundation code that's already in the repo.
-================================================================================
 
-Hey team,
-
-I know most of you haven't written React or Solidity before. That's fine.
-Here's how this works:
-
-  - The smart contracts are DONE. All 12 contracts, all 106 tests pass.
-  - The foundation code is DONE. I've written the scaffold, the 4 core hooks,
-    the provider setup, the address/ABI imports, routing, and one complete
-    reference screen (Profile Dashboard).
-  - YOUR job is to build the remaining screens and features. Each one follows
-    the same pattern as the reference screen I built. You'll use AI to write
-    the code, but you'll give it the right context by pointing it at the
-    existing code.
-
-The KEY difference from just "asking AI to build something": your AI has the
-entire project open. It can READ the existing hooks, the existing screen, the
-ABIs, the addresses file. So instead of vague prompts, you say:
-
-  "Look at src/pages/ProfileDashboard.tsx for the pattern. Build a new page
-   for DungeonDrops following the same structure. Here's what it needs to
-   show: [specifics]. Use the same hooks (useTBA, usePlayerProfile) and the
-   same Tailwind dark theme."
-
-That "look at the existing code" part is what makes this work. The AI sees
-real imports, real function signatures, real patterns — and produces code that
-actually fits.
-
-
-HOW TO USE AI WITHOUT PAID TOOLS (this is important)
-=====================================================
-
-You do NOT need Cursor, Copilot Pro, or any paid tool. Here are free options:
-
-Option A — VS Code + Copilot (free tier)
-  GitHub Copilot has a free tier. Sign up at github.com/features/copilot.
-  In VS Code, install the "GitHub Copilot" and "GitHub Copilot Chat" extensions.
-  Open the Copilot Chat panel (Ctrl+Shift+I or Cmd+Shift+I on Mac).
-  It can read your open files. Before prompting, OPEN the reference files
-  (ProfileDashboard.tsx, useTBA.ts, addresses.ts) in tabs so Copilot sees them.
-
-Option B — ChatGPT / Claude (free web)
-  This is less ideal but works. The trick: PASTE the reference code INTO your
-  prompt. Before asking "build DungeonDrops page", paste:
-    1. The entire useContracts.ts hook
-    2. The entire useTBA.ts hook
-    3. The ADDRESSES object from addresses.ts
-    4. The ProfileDashboard.tsx as an example
-  Then say "build a DungeonDrops page following the exact same patterns."
-  Without pasting the context, the AI will guess and produce broken code.
-
-Option C — Cline / Continue (VS Code extensions, free with API key)
-  These extensions work like Copilot but use your own API key or free models.
-  Cline supports Ollama (local models) and free API tiers.
-
-Whichever you use: ALWAYS give it the existing code as context. That's the
-whole point of Approach 3.
-
-
-WHAT'S ALREADY IN THE REPO (this is what I built)
-===================================================
+WHAT'S ALREADY IN THE REPO
 
 After you clone and pull, here's what you should see:
 
@@ -95,7 +31,7 @@ pixelvault/
 ├── hardhat.config.ts
 └── package.json
 
-After deploying to your appchain (Phase 1), you'll also create:
+After deploying to your appchain (Phase 1)(not need to be done now, needs to be done during final submission), you'll also create:
 
 pixelvault/frontend/
 ├── index.html
@@ -133,10 +69,7 @@ YOUR TASKS — screens to build:
   pages/GasSettings.tsx        ← teammate C
   pages/GameHub.tsx            ← whoever finishes first
 
-
-================================================================================
 BEFORE YOU BUILD ANYTHING — UNDERSTAND THE PRODUCT
-================================================================================
 
 PixelVault is a cross-game player economy on Initia MiniEVM.
 
@@ -177,8 +110,7 @@ Here's how it works, piece by piece:
     reward + seasonal item. Also goes to your TBA.
 
 
-HOW EVERY GAME ACTION WORKS (read this twice, seriously)
-=========================================================
+HOW EVERY GAME ACTION WORKS (important)
 
 Every single game action follows this path:
 
@@ -205,10 +137,7 @@ The ONLY exception: PlayerProfile.mint() on the Create Profile screen is
 called directly from the EOA (because the TBA doesn't exist yet).
 
 
-================================================================================
-IMPORTANT — HOW TEAMMATES DEVELOP ON THEIR OWN MACHINES
-Read this BEFORE anything else if you're a teammate, not the deployer.
-================================================================================
+IMPORTANT — HOW TO DEVELOP ON YOUR OWN MACHINES
 
 The Initia appchain runs on the DEPLOYER'S machine (localhost:8545). You
 CANNOT connect to it from your laptop. That's fine — you don't need to.
@@ -269,24 +198,19 @@ Chain ID / Private Key confusion:
   - The .env file handles this. You never need to edit contract code.
 
 
-================================================================================
-PHASE 1 — DEPLOY TO YOUR APPCHAIN (INITIA)
-The deployer does this for final demo. Teammates: skip to Phase 3.
-================================================================================
+PHASE 1 — DEPLOY TO YOUR APPCHAIN (INITIA) (SKIP THIS FOR NOW.)
 
 This produces the deployed-addresses.json file for the REAL Initia appchain.
 This is only needed for the final deployment, not for local development.
 
---- Step 1: Make sure your appchain is running ---
-
+Step 1: Make sure your appchain is running
   weave rollup start -d
-
   VERIFY IT WORKS:
   curl localhost:8545 -X POST -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}'
 
-  ✅ You should see: {"jsonrpc":"2.0","id":1,"result":"0x..."} (some hex number)
-  ❌ If you see "connection refused": the node isn't up yet. Wait 30 seconds, try again.
+   You should see: {"jsonrpc":"2.0","id":1,"result":"0x..."} (some hex number)
+   If you see "connection refused": the node isn't up yet. Wait 30 seconds, try again.
 
 
 --- Step 2: Start the bridge bots ---
@@ -321,9 +245,9 @@ NEVER push .env to GitHub. It's already in .gitignore.
   cd pixelvault
   npx hardhat run scripts/deploy.ts --network minievm
 
-  ✅ You should see every contract print its address, ending with "All contracts deployed"
-  ❌ "insufficient funds": fund your gas station with INIT from the faucet
-  ❌ "nonce too high": restart the node (weave rollup restart)
+   You should see every contract print its address, ending with "All contracts deployed"
+   "insufficient funds": fund your gas station with INIT from the faucet
+   "nonce too high": restart the node (weave rollup restart)
 
 
 --- Step 5: Wire contracts ---
@@ -333,7 +257,7 @@ NEVER push .env to GitHub. It's already in .gitignore.
   This grants permissions: which contracts can mint items, issue badges, etc.
   If you skip this, DungeonDrops and HarvestField won't work.
 
-  ✅ You should see lines like "grantGameRole done", "grantIssuerRole done"
+   You should see lines like "grantGameRole done", "grantIssuerRole done"
 
 
 --- Step 6: Verify deployment works ---
@@ -361,10 +285,7 @@ NOTE: Do NOT do the PXL gas migration (PXLTokenInitia) now. That's Phase 6,
 the very last step. Standard PXLToken works fine for development.
 
 
-================================================================================
-PHASE 2 — FRONTEND FOUNDATION
-I (the contract author) build all of this. Teammates: skip to Phase 3.
-================================================================================
+PHASE 2 — FRONTEND FOUNDATION (SKIP THIS AS WELL, THIS IS JUST FOR SHOWING HOW/WHAT TO DO)
 
 This section documents what I built and pushed. It's here so you understand
 the code structure. Don't re-build any of this — it's already in the repo.
@@ -458,21 +379,18 @@ Open this file and study it before building anything. It demonstrates:
 Every screen you build follows the same pattern. Look at the file.
 
 
-================================================================================
-PHASE 3 — BUILD THE REMAINING SCREENS
+PHASE 3 — BUILD THE REMAINING SCREENS (Start from here)
 This is YOUR job. Follow the instructions below, one screen at a time.
-================================================================================
 
 For EACH screen:
   1. Read the description below to understand what the screen does
   2. Open ProfileDashboard.tsx as your reference
-  3. Use AI with the prompt provided (paste it + point AI at existing code)
   4. Copy the AI's output into the correct file in pages/
   5. Run the verification check
-  6. If it errors, follow the debugging steps at the bottom of this guide
+  6. If it errors, then need debugging
 
 
---- SCREEN: DungeonDrops.tsx (pages/DungeonDrops.tsx) ---
+SCREEN: DungeonDrops.tsx (pages/DungeonDrops.tsx)
 
 WHAT IT IS:
   The main game screen. Player clicks "Enter Dungeon", pays 10 DNGN, gets
@@ -507,7 +425,7 @@ WHAT CONTRACT FUNCTIONS YOU'LL CALL:
   Event to parse after tx:
     - DungeonEntered(player, itemId, roll)
 
-HOW TO PROMPT YOUR AI:
+Work:
   Open these files in your editor first (or paste them into the prompt):
     - src/pages/ProfileDashboard.tsx (the reference)
     - src/hooks/useTBA.ts
@@ -515,9 +433,9 @@ HOW TO PROMPT YOUR AI:
     - src/lib/addresses.ts
     - src/lib/abis/index.ts
 
-  Then give this prompt:
+  
 
-  "I need you to build a React page component at src/pages/DungeonDrops.tsx
+  "You to build a React page component at src/pages/DungeonDrops.tsx
   for a dungeon game. Look at src/pages/ProfileDashboard.tsx for the exact
   code patterns — same imports, same hooks, same Tailwind dark theme.
 
@@ -543,13 +461,13 @@ VERIFY IT WORKS:
   2. Open http://localhost:5173/dungeon in browser
   3. You should see the dungeon screen with your DNGN balance
   4. If you have DNGN tokens, click Enter Dungeon → should show a loot item
-  ❌ If you see a blank page: open browser console (F12), check the red error
-  ❌ If "Cannot read property of undefined": a hook is returning undefined — 
+   If you see a blank page: open browser console (F12), check the red error
+   If "Cannot read property of undefined": a hook is returning undefined — 
      check that usePlayerProfile().tba is not null
-  ❌ If the tx fails: check that wire.ts was run (DungeonDrops needs GAME_ROLE)
+   If the tx fails: check that wire.ts was run (DungeonDrops needs GAME_ROLE)
 
 
---- SCREEN: HarvestField.tsx (pages/HarvestField.tsx) ---
+ SCREEN: HarvestField.tsx (pages/HarvestField.tsx)
 
 WHAT IT IS:
   A staking game with 3 UI states. Player stakes HRV tokens, waits 100
@@ -584,7 +502,7 @@ WHAT CONTRACT FUNCTIONS YOU'LL CALL:
     - harvest()        — no arguments
     - unstake()        — no arguments
 
-HOW TO PROMPT YOUR AI:
+Work:
   Open ProfileDashboard.tsx + useTBA.ts + usePlayerProfile.ts first. Then:
 
   "Build src/pages/HarvestField.tsx for a staking game. Look at
@@ -607,11 +525,11 @@ VERIFY IT WORKS:
   1. Navigate to /harvest
   2. You should see your HRV balance and a stake form
   3. If you stake tokens, the progress bar should appear and update
-  ❌ "Amount must be > 0": you need to enter a number
-  ❌ Progress bar stuck: check the 5-second poll interval is running
+   "Amount must be > 0": you need to enter a number
+   Progress bar stuck: check the 5-second poll interval is running
 
 
---- SCREEN: DEX.tsx (pages/DEX.tsx) ---
+SCREEN: DEX.tsx (pages/DEX.tsx)
 
 WHAT IT IS:
   Token exchange. Players swap PXL for game tokens and back. Also has
@@ -685,9 +603,9 @@ VERIFY IT WORKS:
   1. Navigate to /dex
   2. You should see token selector and pool reserves
   3. Try swapping PXL → DNGN with a small amount
-  ❌ "Pool not active": the pool hasn't been initialized with liquidity yet.
+   "Pool not active": the pool hasn't been initialized with liquidity yet.
      The deployer needs to add initial liquidity via the wire script.
-  ❌ "Slippage exceeded": set minOut to 0 for testing, then add proper slippage later
+   "Slippage exceeded": set minOut to 0 for testing, then add proper slippage later
 
 
 --- SCREEN: Marketplace.tsx (pages/Marketplace.tsx) ---
@@ -742,7 +660,7 @@ VERIFY IT WORKS:
   1. Navigate to /marketplace
   2. You should see an empty listings grid (no one has listed anything yet)
   3. If you have items, try listing one
-  ❌ "ERC1155: caller is not token owner": you're calling from the wrong
+  "ERC1155: caller is not token owner": you're calling from the wrong
      address. Items are in the TBA — the TBA must call setApprovalForAll.
 
 
@@ -803,10 +721,7 @@ HOW TO PROMPT YOUR AI:
   Same dark theme."
 
 
-================================================================================
 PHASE 4 — NATIVE INITIA FEATURES
-================================================================================
-
 --- 4A: Auto-signing (REQUIRED — already wired, just use it) ---
 
 The useAutoSign hook is already built. You just need to use it in screens:
@@ -836,7 +751,7 @@ InterwovenKit has a username resolution API. Build a small utility:
 Cache results so you don't re-fetch.
 
 
---- 4C: Bridge (one line of code) ---
+ 4C: Bridge (one line of code) 
 
 Already in the DEX screen prompt. It's literally:
   const { openBridge } = useInterwovenKit()
@@ -845,10 +760,8 @@ Already in the DEX screen prompt. It's literally:
 InterwovenKit provides the entire bridge UI. You just add a button.
 
 
-================================================================================
 PHASE 5 — POLISH
 Do this AFTER all screens work.
-================================================================================
 
 --- Security checklist ---
 
@@ -1055,9 +968,7 @@ Things WILL break. This section tells you what to do.
     Example: 'evm/5fbdb2315678afecb367f032d93f642f64180aa3'
 
 
-================================================================================
 QUICK REFERENCE
-================================================================================
 
 --- Contract addresses (all from ADDRESSES object in lib/addresses.ts) ---
 

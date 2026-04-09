@@ -32,7 +32,7 @@ contract Marketplace is ERC2771Context, ReentrancyGuard, IERC1155Receiver {
         bool active;
     }
 
-    // --- ERC1155 RECEIVER HELPERS ---
+    // ERC1155 RECEIVER HELPERS
     function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
         return IERC1155Receiver.onERC1155Received.selector;
     }
@@ -140,7 +140,7 @@ contract Marketplace is ERC2771Context, ReentrancyGuard, IERC1155Receiver {
         emit ItemSold(listingId, _msgSender(), listing.seller, amount, totalPXL);
     }
 
-    // --- DIAMOND INHERITANCE OVERRIDES ---
+    // DIAMOND INHERITANCE OVERRIDES ---
     function _msgSender() internal view override returns (address) {
         return ERC2771Context._msgSender();
     }
