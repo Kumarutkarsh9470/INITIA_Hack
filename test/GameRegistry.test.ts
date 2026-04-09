@@ -94,7 +94,7 @@ describe("GameRegistry", function () {
       const gameId = ethers.keccak256(ethers.toUtf8Bytes("TestGame"));
       await expect(
         gameRegistry.recordSwap(gameId, ethers.parseEther("100"), dev1.address)
-      ).to.be.revertedWith("Only trusted DEX");
+      ).to.be.revertedWith("Only trusted DEX can record swaps");
     });
 
     it("should count unique players correctly", async function () {

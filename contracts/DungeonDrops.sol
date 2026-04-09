@@ -14,16 +14,14 @@ contract DungeonDrops is ERC2771Context, ReentrancyGuard {
     IERC20 public immutable dngnToken;
     IGameAssetCollection public immutable assetCollection;
     IAchievementBadge public immutable achievementBadge;
-
+    address public immutable owner;
     uint256 public constant ENTRY_FEE = 10 * 1e18;
     uint256 public constant ITEM_COMMON_SWORD = 1;
     uint256 public constant ITEM_RARE_SHIELD = 2;
     uint256 public constant ITEM_LEGENDARY_CROWN = 3;
     uint256 public constant BADGE_FIRST_CLEAR = 1;
-
     mapping(address => uint256) public playerNonce;
     uint256 public totalRuns;
-
     event DungeonEntered(address indexed player, uint256 itemId, uint256 roll);
 
     constructor(
@@ -35,6 +33,7 @@ contract DungeonDrops is ERC2771Context, ReentrancyGuard {
         dngnToken = IERC20(_dngnToken);
         assetCollection = IGameAssetCollection(_assetCollection);
         achievementBadge = IAchievementBadge(_achievementBadge);
+        owner = msg.sender;
     }
 
     function enterDungeon() external nonReentrant {
@@ -64,14 +63,29 @@ contract DungeonDrops is ERC2771Context, ReentrancyGuard {
         // Mint item to player
         assetCollection.mintItem(playerTBA, itemId, 1);
         totalRuns++;
-
         // First clear badge
         if (playerNonce[playerTBA] == 1) {
             achievementBadge.issueBadge(playerTBA, BADGE_FIRST_CLEAR);
         }
-
         emit DungeonEntered(playerTBA, itemId, rand);
     }
 
+    function withdrawFees(address to) external {
+        require(msg.sender == owner, "Only owner");
+        uint256 balance = dngnToken.balanceOf(address(this));
+        require(balance > 0, "No fees");
+        dngnToken.safeTransfer(to, balance);
+    }
 
+    function _msgSender() internal view override returns (address) {
+        return ERC2771Context._msgSender();
+    }
+
+    function _msgData() internal view override returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view override returns (uint256) {
+        return ERC2771Context._contextSuffixLength();
+    }
 }

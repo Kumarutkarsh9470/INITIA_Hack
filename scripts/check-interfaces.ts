@@ -1,16 +1,13 @@
 /**
  * Contract Interface Checker
- * 
+ *
  * Run after replacing contracts:
  *   npx hardhat compile
  *   npx ts-node scripts/check-interfaces.ts
- * 
+ *
  * Compares compiled artifacts against CONTRACT_SNAPSHOT.json
- * and reports all breaking changes that need fixing in:
- *   - scripts/deploy.ts
- *   - scripts/wire.ts
- *   - test/shared/fixtures.ts
- *   - deployed-addresses.json
+ * and reports all breaking changes that need fixing in
+ * deploy.ts, wire.ts, fixtures.ts, and deployed-addresses.json.
  */
 
 import * as fs from "fs";

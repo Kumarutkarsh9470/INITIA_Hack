@@ -79,7 +79,7 @@ describe("GameAssetCollection", function () {
   it("should reject minting undefined item", async function () {
     const { gameContract, alice, assets } = await loadFixture(deployAssets);
     await expect(assets.connect(gameContract).mintItem(alice.address, 99, 1))
-      .to.be.revertedWith("Item not defined");
+      .to.be.revertedWith("Item doesn't exist");
   });
 
   it("should reject minting without GAME_ROLE", async function () {

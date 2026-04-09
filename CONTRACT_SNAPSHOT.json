@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "description": "Snapshot of all contract interfaces as of the lead developer's implementation. When juniors replace contracts, run `npx hardhat run scripts/check-interfaces.ts` to compare new contracts against this snapshot and identify breaking changes.",
+    "description": "Snapshot of all contract interfaces as of the original implementation. After replacing any contracts, run npx ts-node scripts/check-interfaces.ts to compare new contracts against this snapshot and identify breaking changes.",
     "generated": "2026-04-08",
     "version": "1.0.0"
   },

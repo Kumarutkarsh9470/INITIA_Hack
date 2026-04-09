@@ -1,78 +1,60 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
-
+pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
-contract AchievementBadge is ERC1155, AccessControl {
+contract AchievementBadge is ERC1155, AccessControl{
+    
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    mapping(uint256 => string) public badgeMetadata; // badgeId => metadata URI
+    mapping(uint256 => bytes32) public badgeToGame;//badgeID=>which Game
 
-    mapping(uint256 => string) public badgeMetadata;
-    mapping(uint256 => bytes32) public badgeToGame;
-
-    mapping(address => uint256) public playerBadgeCount;
-    mapping(address => uint256) public playerUniqueGames;
-    mapping(address => mapping(bytes32 => bool)) private _playerGameSeen;
-
-    event BadgeDefined(uint256 indexed badgeId, bytes32 indexed gameId, string metadataURI);
-    event BadgeIssued(address indexed player, uint256 indexed badgeId);
+    // For reputation tracking:
+    mapping(address => uint256) public playerBadgeCount; // total badges earned
+    mapping(address => uint256) public playerUniqueGames; // how many different games
+    mapping(address => mapping(bytes32 => bool)) private _playerGameSeen; // prevents doublecounting
 
     constructor() ERC1155("") {
+        // The deployer (Registry) gets admin rights to grant ISSUER_ROLE to games
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
+    function safeTransferFrom(address, address, uint256, uint256, bytes memory) public pure override {
+        revert("Badges are non-transferable");
+    }
+    function safeBatchTransferFrom(address, address, uint256[] memory, uint256[] memory, bytes memory) public pure override {
+        revert("Badges are non-transferable");
+    }
+    // Now if anyone tries to transfer a badge, the transaction fails.
+    // The only way to get a badge is to earn
 
-    function defineBadge(
-        uint256 badgeId,
-        bytes32 gameId,
-        string calldata metadataURI
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function defineBadge(uint256 badgeId, bytes32 gameId, string calldata metadataURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
         badgeMetadata[badgeId] = metadataURI;
         badgeToGame[badgeId] = gameId;
-        emit BadgeDefined(badgeId, gameId, metadataURI);
     }
 
-    function issueBadge(address player, uint256 badgeId) external onlyRole(ISSUER_ROLE) {
-        _mint(player, badgeId, 1, "");
-        playerBadgeCount[player]++;
-
+    function issueBadge(address player, uint256 badgeId) external onlyRole(ISSUER_ROLE){
         bytes32 gameId = badgeToGame[badgeId];
-        if (!_playerGameSeen[player][gameId]) {
+        // Ensuring badge is defined before issuing and storing in local variable to optimize gas and minimize frequent lookups
+        require(gameId != bytes32(0), "Badge not defined");
+        _mint(player, badgeId, 1, "");
+         playerBadgeCount[player]++;
+         if (!_playerGameSeen[player][gameId]) {
             _playerGameSeen[player][gameId] = true;
             playerUniqueGames[player]++;
         }
 
-        emit BadgeIssued(player, badgeId);
     }
 
-    function getReputation(address player) external view returns (uint256) {
+    function getReputation(address player) external view returns (uint256){
         return (playerBadgeCount[player] * 10) + (playerUniqueGames[player] * 50);
-    }
+        //Playing many different games gives more reputation than grinding badges
+        // in one game. This encourages players to try new games.
 
-    // Make badges non-transferable (soulbound)
-    function safeTransferFrom(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes memory
-    ) public pure override {
-        revert("Badges are non-transferable");
     }
-
-    function safeBatchTransferFrom(
-        address,
-        address,
-        uint256[] memory,
-        uint256[] memory,
-        bytes memory
-    ) public pure override {
-        revert("Badges are non-transferable");
-    }
-
     function uri(uint256 badgeId) public view override returns (string memory) {
         return badgeMetadata[badgeId];
-    }
-
+    } //Extra function added so front-ends can see the badge info
+ 
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -81,4 +63,7 @@ contract AchievementBadge is ERC1155, AccessControl {
     {
         return super.supportsInterface(interfaceId);
     }
-}
+ 
+ }
+
+    

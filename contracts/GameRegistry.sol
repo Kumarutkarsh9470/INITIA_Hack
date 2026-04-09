@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+
+interface IGameToken {
+    function mint(address to, uint256 amount) external;
+}
+
+interface IGameAssetCollection {
+    function grantGameRole(address gameContract) external;
+    function defineItem(uint256 itemId, string calldata metadataURI) external;
+}
+
 import "./GameToken.sol";
 import "./GameAssetCollection.sol";
 
 contract GameRegistry is Ownable {
+    
     struct GameData {
         address tokenAddress;
         address assetCollection;
@@ -26,10 +37,10 @@ contract GameRegistry is Ownable {
     mapping(bytes32 => mapping(address => bool)) private _playerSeen;
 
     event GameRegistered(
-        bytes32 indexed gameId,
+        bytes32 indexed gameId, 
         address tokenAddress,
-        address assetCollection,
-        address developer,
+        address assetCollection, 
+        address developer, 
         string name
     );
     event SwapRecorded(bytes32 indexed gameId, uint256 volume, address player);
@@ -42,21 +53,20 @@ contract GameRegistry is Ownable {
         trustedDEX = dex;
     }
 
-    function registerGame(
-        string calldata name,
-        string calldata symbol,
-        address developer,
-        uint256 initialSupply
-    ) external onlyOwner returns (address, address) {
+    function registerGame( string calldata name, string calldata symbol, address developer, uint256 initialSupply ) external onlyOwner returns (address, address) {
         bytes32 gameId = keccak256(abi.encodePacked(name));
         require(games[gameId].tokenAddress == address(0), "Game already exists");
 
+        // Factory Deployment
         GameToken token = new GameToken(name, symbol, gameId, developer, initialSupply);
         GameAssetCollection assets = new GameAssetCollection(name);
 
-        // Grant asset collection admin & minter roles to the developer
-        assets.grantRole(assets.DEFAULT_ADMIN_ROLE(), developer);
-        assets.grantRole(assets.MINTER_ROLE(), developer);
+        // Grant roles to registry owner for management
+        assets.grantRole(bytes32(0), owner());
+        assets.grantRole(keccak256("MINTER_ROLE"), owner());
+
+        // Transfer GameToken ownership to the developer
+        token.transferOwnership(developer);
 
         games[gameId] = GameData({
             tokenAddress: address(token),
@@ -80,12 +90,16 @@ contract GameRegistry is Ownable {
     }
 
     function recordSwap(bytes32 gameId, uint256 volume, address player) external {
-        require(msg.sender == trustedDEX, "Only trusted DEX");
-        games[gameId].totalVolume += volume;
+        require(msg.sender == trustedDEX, "Only trusted DEX can record swaps");
+        
+        GameData storage game = games[gameId];
+        require(game.active, "Game is not active");
+
+        game.totalVolume += volume;
 
         if (!_playerSeen[gameId][player]) {
             _playerSeen[gameId][player] = true;
-            games[gameId].uniquePlayers++;
+            game.uniquePlayers += 1;
         }
 
         emit SwapRecorded(gameId, volume, player);
@@ -93,9 +107,13 @@ contract GameRegistry is Ownable {
 
     function getGameRating(bytes32 gameId) public view returns (uint256) {
         GameData storage game = games[gameId];
-        if (!game.active || game.tokenAddress == address(0)) return 0;
+        
+        if (!game.active || game.tokenAddress == address(0)) {
+            return 0;
+        }
 
-        uint256 volNorm = game.totalVolume / 1e18 + 1;
+        // Normalize values to prevent log(0)
+        uint256 volNorm = (game.totalVolume / 1e18) + 1;
         uint256 playerNorm = game.uniquePlayers + 1;
 
         uint256 volScore = _log2(volNorm);
@@ -127,30 +145,5 @@ contract GameRegistry is Ownable {
 
     function getGameCount() external view returns (uint256) {
         return gameIds.length;
-    }
-
-    function getGameData(bytes32 gameId) external view returns (
-        address tokenAddress,
-        address assetCollection,
-        address developer,
-        string memory name,
-        string memory symbol,
-        uint256 totalVolume,
-        uint256 uniquePlayers,
-        uint256 registeredAt,
-        bool active
-    ) {
-        GameData storage g = games[gameId];
-        return (
-            g.tokenAddress,
-            g.assetCollection,
-            g.developer,
-            g.name,
-            g.symbol,
-            g.totalVolume,
-            g.uniquePlayers,
-            g.registeredAt,
-            g.active
-        );
     }
 }

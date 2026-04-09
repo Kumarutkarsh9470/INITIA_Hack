@@ -1,0 +1,1102 @@
+================================================================================
+PIXELVAULT — BUILDER'S HANDBOOK
+How teammates complete the frontend using AI, building on top of the
+foundation code that's already in the repo.
+================================================================================
+
+Hey team,
+
+I know most of you haven't written React or Solidity before. That's fine.
+Here's how this works:
+
+  - The smart contracts are DONE. All 12 contracts, all 106 tests pass.
+  - The foundation code is DONE. I've written the scaffold, the 4 core hooks,
+    the provider setup, the address/ABI imports, routing, and one complete
+    reference screen (Profile Dashboard).
+  - YOUR job is to build the remaining screens and features. Each one follows
+    the same pattern as the reference screen I built. You'll use AI to write
+    the code, but you'll give it the right context by pointing it at the
+    existing code.
+
+The KEY difference from just "asking AI to build something": your AI has the
+entire project open. It can READ the existing hooks, the existing screen, the
+ABIs, the addresses file. So instead of vague prompts, you say:
+
+  "Look at src/pages/ProfileDashboard.tsx for the pattern. Build a new page
+   for DungeonDrops following the same structure. Here's what it needs to
+   show: [specifics]. Use the same hooks (useTBA, usePlayerProfile) and the
+   same Tailwind dark theme."
+
+That "look at the existing code" part is what makes this work. The AI sees
+real imports, real function signatures, real patterns — and produces code that
+actually fits.
+
+
+HOW TO USE AI WITHOUT PAID TOOLS (this is important)
+=====================================================
+
+You do NOT need Cursor, Copilot Pro, or any paid tool. Here are free options:
+
+Option A — VS Code + Copilot (free tier)
+  GitHub Copilot has a free tier. Sign up at github.com/features/copilot.
+  In VS Code, install the "GitHub Copilot" and "GitHub Copilot Chat" extensions.
+  Open the Copilot Chat panel (Ctrl+Shift+I or Cmd+Shift+I on Mac).
+  It can read your open files. Before prompting, OPEN the reference files
+  (ProfileDashboard.tsx, useTBA.ts, addresses.ts) in tabs so Copilot sees them.
+
+Option B — ChatGPT / Claude (free web)
+  This is less ideal but works. The trick: PASTE the reference code INTO your
+  prompt. Before asking "build DungeonDrops page", paste:
+    1. The entire useContracts.ts hook
+    2. The entire useTBA.ts hook
+    3. The ADDRESSES object from addresses.ts
+    4. The ProfileDashboard.tsx as an example
+  Then say "build a DungeonDrops page following the exact same patterns."
+  Without pasting the context, the AI will guess and produce broken code.
+
+Option C — Cline / Continue (VS Code extensions, free with API key)
+  These extensions work like Copilot but use your own API key or free models.
+  Cline supports Ollama (local models) and free API tiers.
+
+Whichever you use: ALWAYS give it the existing code as context. That's the
+whole point of Approach 3.
+
+
+WHAT'S ALREADY IN THE REPO (this is what I built)
+===================================================
+
+After you clone and pull, here's what you should see:
+
+pixelvault/
+├── contracts/                    ← ALL DONE, don't touch these
+│   ├── PlayerProfile.sol         ← includes ownerToTokenId fix
+│   ├── DungeonDrops.sol
+│   ├── HarvestField.sol
+│   ├── Marketplace.sol
+│   ├── PixelVaultDEX.sol
+│   ├── GameRegistry.sol
+│   ├── AchievementBadge.sol
+│   ├── GasPaymaster.sol
+│   ├── PXLToken.sol
+│   ├── PXLTokenInitia.sol
+│   ├── CommonRelic.sol
+│   ├── GameToken.sol
+│   ├── GameAssetCollection.sol
+│   ├── erc6551/
+│   │   ├── ERC6551Account.sol
+│   │   └── ERC6551Registry.sol
+│   ├── initia/                   ← Initia-specific ERC20 precompile wrappers
+│   └── interfaces/
+├── test/                         ← ALL DONE, 106 tests passing
+├── scripts/
+│   ├── deploy.ts                 ← deploys everything
+│   └── wire.ts                   ← sets permissions between contracts
+├── deployed-addresses.json       ← contract addresses (after deployment)
+├── hardhat.config.ts
+└── package.json
+
+After deploying to your appchain (Phase 1), you'll also create:
+
+pixelvault/frontend/
+├── index.html
+├── vite.config.ts
+├── tailwind.config.js
+├── .env
+├── package.json
+└── src/
+    ├── main.tsx                  ← Provider setup (InterwovenKit + Wagmi + React Query)
+    ├── App.tsx                   ← Router with all routes
+    ├── lib/
+    │   ├── addresses.ts          ← imports deployed-addresses.json
+    │   ├── constants.ts          ← gameId hashes, item names, badge names
+    │   └── abis/                 ← ABI JSON files for every contract
+    │       └── index.ts          ← re-exports all ABIs
+    ├── hooks/
+    │   ├── useContracts.ts       ← typed contract instances for every contract
+    │   ├── usePlayerProfile.ts   ← profile data: tokenId, TBA, username, reputation
+    │   ├── useTBA.ts             ← execute game actions through the TBA
+    │   └── useAutoSign.ts        ← session keys for auto-signing
+    ├── components/
+    │   └── ProfileGate.tsx       ← redirects to /create-profile if no profile
+    └── pages/
+        ├── Landing.tsx           ← connect wallet page
+        ├── CreateProfile.tsx     ← mint profile NFT
+        └── ProfileDashboard.tsx  ← ★ THE REFERENCE SCREEN ★
+                                     (tokens, items, badges, reputation, activity)
+
+
+YOUR TASKS — screens to build:
+  pages/DungeonDrops.tsx       ← teammate A
+  pages/HarvestField.tsx       ← teammate A or B
+  pages/DEX.tsx                ← teammate B
+  pages/Marketplace.tsx        ← teammate C
+  pages/GasSettings.tsx        ← teammate C
+  pages/GameHub.tsx            ← whoever finishes first
+
+
+================================================================================
+BEFORE YOU BUILD ANYTHING — UNDERSTAND THE PRODUCT
+================================================================================
+
+PixelVault is a cross-game player economy on Initia MiniEVM.
+
+The idea in one sentence: you mint an NFT that becomes your IDENTITY across
+all games, and that NFT has its own WALLET that holds all your stuff.
+
+Here's how it works, piece by piece:
+
+  PlayerProfile — You mint one NFT per wallet. That NFT automatically gets
+    its own wallet (a "Token Bound Account" / TBA) via ERC-6551. This TBA
+    is where ALL your game stuff lives.
+
+  TBA (Token Bound Account) — Your game wallet. It's controlled by your
+    browser wallet (EOA), but items/tokens/badges go INTO the TBA, not the
+    EOA. Think of the EOA as the key and the TBA as the safe.
+
+  PXL Token — The base currency. Every game token trades against PXL on
+    the DEX. Later, PXL becomes the chain's gas token.
+
+  GameRegistry — A registry of all games. When registered, each game gets
+    its own ERC20 token and ERC1155 item collection auto-deployed.
+
+  PixelVaultDEX — A simple AMM (like mini Uniswap). Swap PXL ↔ game tokens.
+
+  GasPaymaster — Players can pay gas in any game token. The paymaster swaps
+    it to PXL behind the scenes. Players never need to hold gas tokens.
+
+  AchievementBadge — Soulbound (non-transferable) ERC1155 badges. Games mint
+    these for milestones. Badges build a reputation score.
+
+  Marketplace — Players list/buy ERC1155 items. Buyers can pay in ANY game
+    token — the marketplace auto-swaps via DEX.
+
+  DungeonDrops — Demo game 1. Pay 10 DNGN, roll for loot (60% Common Sword,
+    30% Rare Shield, 10% Legendary Crown). Items go to your TBA.
+
+  HarvestField — Demo game 2. Stake HRV tokens, wait 100 blocks, harvest
+    reward + seasonal item. Also goes to your TBA.
+
+
+HOW EVERY GAME ACTION WORKS (read this twice, seriously)
+=========================================================
+
+Every single game action follows this path:
+
+  Your browser wallet (EOA)
+    → calls TBA.execute(gameContractAddress, 0, calldata, 0)
+      → TBA forwards the call to the game contract
+        → game contract does its thing (mints items, etc.)
+          → items land in the TBA
+
+Concrete example — when someone clicks "Enter Dungeon":
+
+  1. Frontend encodes enterDungeon() into raw bytes (calldata)
+  2. Frontend wraps that in: tba.execute(DungeonDrops address, 0, calldata, 0)
+  3. Player's browser wallet signs the execute() call
+  4. TBA checks "does the signer own the NFT?" → yes → forwards to DungeonDrops
+  5. DungeonDrops charges 10 DNGN from the TBA, rolls dice, mints a loot item
+  6. The loot item lands in the TBA (not the EOA)
+
+This is why useTBA.ts exists. Every screen that does a game action calls:
+  tba.execute(contractAddress, 0n, encodedCalldata)
+...and useTBA handles the wrapping and signing internally.
+
+The ONLY exception: PlayerProfile.mint() on the Create Profile screen is
+called directly from the EOA (because the TBA doesn't exist yet).
+
+
+================================================================================
+IMPORTANT — HOW TEAMMATES DEVELOP ON THEIR OWN MACHINES
+Read this BEFORE anything else if you're a teammate, not the deployer.
+================================================================================
+
+The Initia appchain runs on the DEPLOYER'S machine (localhost:8545). You
+CANNOT connect to it from your laptop. That's fine — you don't need to.
+
+For FRONTEND DEVELOPMENT, you use a local Hardhat node instead:
+
+  1. Clone the repo:
+     git clone https://github.com/Kumarutkarsh9470/INITIA_Hack.git
+     cd INITIA_Hack
+
+  2. Install contract dependencies:
+     npm install
+
+  3. Start a local Hardhat node (runs at localhost:8545, same port):
+     npx hardhat node
+
+     Leave this terminal open. It stays running.
+
+  4. In a SECOND terminal, deploy contracts to your local node:
+     npx hardhat run scripts/deploy.ts --network localhost
+     npx hardhat run scripts/wire.ts --network localhost
+
+     This creates deployed-addresses.json with YOUR local addresses.
+
+  5. Create the .env file for the frontend:
+     cd frontend
+     cp .env.example .env
+
+     The defaults (.env.example) point to localhost:8545 — they work
+     with the local Hardhat node out of the box.
+
+  6. Install frontend deps and run:
+     npm install
+     npm run dev
+
+     Open http://localhost:5173 in your browser. Done.
+
+WHAT THIS MEANS:
+  - You do NOT need Weave CLI, initiad, or an Initia appchain to develop.
+  - You do NOT need the deployer's private key or chain ID.
+  - The deployed-addresses.json in the repo is from the DEPLOYER's Hardhat.
+    When you deploy locally (step 4), it gets overwritten with YOUR addresses.
+  - Your local Hardhat node auto-creates 20 test accounts with ETH.
+  - Wallet: use MetaMask, add network localhost:8545, chain ID 31337.
+
+FOR FINAL DEMO / SUBMISSION:
+  - The deployer deploys to the REAL Initia appchain (Phase 1 below).
+  - The deployer pushes the final deployed-addresses.json.
+  - The frontend .env is updated to point to the real appchain RPC.
+  - Everyone demos from the deployer's setup (or a shared server).
+
+Chain ID / Private Key confusion:
+  - For LOCAL development: Chain ID = 31337 (Hardhat default). Private key =
+    any of the 20 auto-generated test keys Hardhat prints when you run
+    `npx hardhat node`.
+  - For REAL deployment: Chain ID = your appchain's ID (e.g., the "trying"
+    chain). Private key = the gas station key from `initiad keys export`.
+  - The .env file handles this. You never need to edit contract code.
+
+
+================================================================================
+PHASE 1 — DEPLOY TO YOUR APPCHAIN (INITIA)
+The deployer does this for final demo. Teammates: skip to Phase 3.
+================================================================================
+
+This produces the deployed-addresses.json file for the REAL Initia appchain.
+This is only needed for the final deployment, not for local development.
+
+--- Step 1: Make sure your appchain is running ---
+
+  weave rollup start -d
+
+  VERIFY IT WORKS:
+  curl localhost:8545 -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}'
+
+  ✅ You should see: {"jsonrpc":"2.0","id":1,"result":"0x..."} (some hex number)
+  ❌ If you see "connection refused": the node isn't up yet. Wait 30 seconds, try again.
+
+
+--- Step 2: Start the bridge bots ---
+
+  weave opinit start executor -d
+  weave relayer start -d
+
+
+--- Step 3: Create .env file ---
+
+In the pixelvault/ root (same folder as hardhat.config.ts), create a file
+called .env with these three lines:
+
+  MINIEVM_RPC_URL=http://localhost:8545
+  PRIVATE_KEY=<your hex private key>
+  CHAIN_ID=<your chain ID number>
+
+How to get PRIVATE_KEY:
+  initiad keys export gas-station --unsafe --unarmored-hex --keyring-backend test
+  Copy the hex output. Add 0x at the front if it's missing.
+
+How to get CHAIN_ID:
+  curl localhost:8545 -X POST -H "Content-Type: application/json" \
+    -d '{"jsonrpc":"2.0","method":"eth_chainId","id":1}'
+  The result is hex. Convert to decimal (0x539 = 1337).
+
+NEVER push .env to GitHub. It's already in .gitignore.
+
+
+--- Step 4: Deploy ---
+
+  cd pixelvault
+  npx hardhat run scripts/deploy.ts --network minievm
+
+  ✅ You should see every contract print its address, ending with "All contracts deployed"
+  ❌ "insufficient funds": fund your gas station with INIT from the faucet
+  ❌ "nonce too high": restart the node (weave rollup restart)
+
+
+--- Step 5: Wire contracts ---
+
+  npx hardhat run scripts/wire.ts --network minievm
+
+  This grants permissions: which contracts can mint items, issue badges, etc.
+  If you skip this, DungeonDrops and HarvestField won't work.
+
+  ✅ You should see lines like "grantGameRole done", "grantIssuerRole done"
+
+
+--- Step 6: Verify deployment works ---
+
+  Run a quick check. In the Hardhat console:
+  npx hardhat console --network minievm
+
+  Then type:
+    const pp = await ethers.getContractAt("PlayerProfile", "<PlayerProfile address from deploy output>")
+    await pp.totalPlayers()
+    // Should return 0n (BigInt zero) — no one has minted yet
+
+  Type .exit to leave.
+
+
+--- Step 7: Push deployed-addresses.json ---
+
+  git add deployed-addresses.json
+  git commit -m "deployed contract addresses for live appchain"
+  git push
+
+After this, tell your teammates to pull. They need this file.
+
+NOTE: Do NOT do the PXL gas migration (PXLTokenInitia) now. That's Phase 6,
+the very last step. Standard PXLToken works fine for development.
+
+
+================================================================================
+PHASE 2 — FRONTEND FOUNDATION
+I (the contract author) build all of this. Teammates: skip to Phase 3.
+================================================================================
+
+This section documents what I built and pushed. It's here so you understand
+the code structure. Don't re-build any of this — it's already in the repo.
+
+--- What I set up ---
+
+1. Scaffolded the Vite + React + TypeScript project in frontend/
+2. Installed all dependencies:
+   - @initia/interwovenkit-react (wallet connection + transaction signing)
+   - wagmi + viem (Ethereum library for encoding/decoding)
+   - @tanstack/react-query (data fetching)
+   - @initia/initia.js (Initia-specific utilities)
+   - tailwindcss (styling)
+   - vite-plugin-node-polyfills (browser compatibility for crypto libs)
+   - react-router-dom (page navigation)
+   - react-hot-toast (notifications)
+
+3. Configured vite.config.ts with node polyfills (required because crypto
+   libraries use Node.js APIs that don't exist in browsers)
+
+4. Set up main.tsx with the three nested providers:
+   QueryClientProvider → WagmiProvider → InterwovenKitProvider
+   This is the InterwovenKit standard pattern from the MiniBank blueprint.
+
+5. Created App.tsx with React Router routes:
+   /             → Landing.tsx
+   /create-profile → CreateProfile.tsx
+   /profile      → ProfileDashboard.tsx (wrapped in ProfileGate)
+   /dungeon      → DungeonDrops.tsx (wrapped in ProfileGate) ← YOU BUILD THIS
+   /harvest      → HarvestField.tsx (wrapped in ProfileGate) ← YOU BUILD THIS
+   /dex          → DEX.tsx (wrapped in ProfileGate)          ← YOU BUILD THIS
+   /marketplace  → Marketplace.tsx (wrapped in ProfileGate)  ← YOU BUILD THIS
+   /gas          → GasSettings.tsx (wrapped in ProfileGate)  ← YOU BUILD THIS
+   /games        → GameHub.tsx (wrapped in ProfileGate)      ← YOU BUILD THIS
+
+6. Created lib/addresses.ts — imports deployed-addresses.json
+7. Created lib/abis/ — ABI exports for every contract
+8. Created lib/constants.ts — gameId hashes, item name mappings, badge names
+9. Built 4 hooks: useContracts, usePlayerProfile, useTBA, useAutoSign
+10. Built ProfileGate component (redirects to create-profile if no profile)
+11. Built Landing.tsx, CreateProfile.tsx, ProfileDashboard.tsx
+
+
+--- Understanding the hooks (you'll use these in every screen) ---
+
+usePlayerProfile() — returns:
+  {
+    hasProfile: boolean,      // has the wallet minted a profile?
+    tokenId: bigint,          // the NFT token ID
+    tba: string,              // the TBA wallet address (0x...)
+    username: string,         // player's display name
+    reputation: bigint,       // reputation score from badges
+    isLoading: boolean,       // true while fetching data
+    refetch: () => void,      // call this after any action to refresh data
+    mint: (username) => void, // ONLY used on CreateProfile screen
+  }
+
+useTBA() — returns:
+  {
+    execute: (target, value, calldata) => Promise<void>,
+    // target = contract address to call
+    // value = ETH to send (usually 0n)
+    // calldata = encoded function call (from encodeFunctionData)
+    isPending: boolean,       // true while tx is processing
+  }
+
+useAutoSign() — returns:
+  {
+    grantSession: () => void,   // opens the session approval popup
+    isSessionActive: boolean,   // true if auto-signing is on
+    revokeSession: () => void,  // ends the session
+  }
+
+
+--- Understanding the reference screen (ProfileDashboard.tsx) ---
+
+Open this file and study it before building anything. It demonstrates:
+
+✓ How to import hooks: usePlayerProfile, useTBA, useContracts
+✓ How to read contract data: publicClient.readContract({ address, abi, functionName, args })
+✓ How to read ERC20 balances: balanceOf(tba) on token contracts
+✓ How to read ERC1155 balances: balanceOf(tba, itemId) on asset collections
+✓ How to format token amounts: formatEther(bigintValue) for display
+✓ How to use ADDRESSES: import { ADDRESSES } from '../lib/addresses'
+✓ How to use ABIs: import { PXLTokenABI } from '../lib/abis'
+✓ How to use constants: ITEM_NAMES, BADGE_NAMES from '../lib/constants'
+✓ How to handle loading states: show skeleton while isLoading
+✓ How to show errors: try/catch with toast.error()
+✓ Tailwind dark theme pattern: bg-gray-900, text-white, border-gray-700, etc.
+
+Every screen you build follows the same pattern. Look at the file.
+
+
+================================================================================
+PHASE 3 — BUILD THE REMAINING SCREENS
+This is YOUR job. Follow the instructions below, one screen at a time.
+================================================================================
+
+For EACH screen:
+  1. Read the description below to understand what the screen does
+  2. Open ProfileDashboard.tsx as your reference
+  3. Use AI with the prompt provided (paste it + point AI at existing code)
+  4. Copy the AI's output into the correct file in pages/
+  5. Run the verification check
+  6. If it errors, follow the debugging steps at the bottom of this guide
+
+
+--- SCREEN: DungeonDrops.tsx (pages/DungeonDrops.tsx) ---
+
+WHAT IT IS:
+  The main game screen. Player clicks "Enter Dungeon", pays 10 DNGN, gets
+  random loot. This is where auto-signing shines — rapid clicks with no
+  wallet popups.
+
+WHAT IT SHOWS:
+  - Entry fee: "10 DNGN" (static text — it's a constant in the contract)
+  - Player's DNGN balance (read from their TBA)
+  - Total global runs: DungeonDrops.totalRuns()
+  - Player's personal run count: DungeonDrops.playerNonce(tba)
+  - A drop rates table: 60% Common Sword, 30% Rare Shield, 10% Legendary Crown
+  - An "Enter Dungeon" button
+  - Auto-sign status indicator (green badge if active, toggle if not)
+
+WHAT HAPPENS WHEN "ENTER DUNGEON" IS CLICKED:
+  1. Encode: encodeFunctionData({ abi: DungeonDropsABI, functionName: 'enterDungeon' })
+  2. Call: tba.execute(ADDRESSES.DungeonDrops, 0n, calldata)
+  3. After tx confirms, parse the DungeonEntered event from the receipt
+  4. Event gives you an itemId: 1=Common Sword, 2=Rare Shield, 3=Legendary Crown
+  5. Show the item name with a simple animation (CSS transition, 500ms)
+
+WHAT CONTRACT FUNCTIONS YOU'LL CALL:
+  Reads (use publicClient.readContract):
+    - DungeonDrops.totalRuns()               → bigint
+    - DungeonDrops.playerNonce(tba)           → bigint
+    - DNGN token balanceOf(tba)              → bigint (use ADDRESSES.DungeonDropsToken as address)
+
+  Write (use useTBA().execute):
+    - enterDungeon() — no arguments
+
+  Event to parse after tx:
+    - DungeonEntered(player, itemId, roll)
+
+HOW TO PROMPT YOUR AI:
+  Open these files in your editor first (or paste them into the prompt):
+    - src/pages/ProfileDashboard.tsx (the reference)
+    - src/hooks/useTBA.ts
+    - src/hooks/usePlayerProfile.ts
+    - src/lib/addresses.ts
+    - src/lib/abis/index.ts
+
+  Then give this prompt:
+
+  "I need you to build a React page component at src/pages/DungeonDrops.tsx
+  for a dungeon game. Look at src/pages/ProfileDashboard.tsx for the exact
+  code patterns — same imports, same hooks, same Tailwind dark theme.
+
+  This page needs:
+  1. Display: player's DNGN balance (ERC20 balanceOf at TBA address using
+     ADDRESSES.DungeonDropsToken), entry fee '10 DNGN', total runs from
+     DungeonDrops.totalRuns(), player run count from DungeonDrops.playerNonce(tba).
+  2. An 'Enter Dungeon' button that calls useTBA().execute() with
+     ADDRESSES.DungeonDrops as target and encodeFunctionData for enterDungeon().
+  3. After the transaction, show a loot reveal with the item name. Map
+     itemId 1='Common Sword', 2='Rare Shield', 3='Legendary Crown'. Use a
+     CSS transition for the reveal animation.
+  4. A static drop rates table: 60% Common, 30% Rare, 10% Legendary.
+  5. Auto-sign indicator from useAutoSign() — green badge if active.
+  6. Disable the button while isPending is true.
+  7. Show toast on success/error using react-hot-toast.
+
+  Use the exact import patterns from ProfileDashboard.tsx. Don't invent new
+  patterns. Follow the same file structure."
+
+VERIFY IT WORKS:
+  1. Run: cd frontend && npm run dev
+  2. Open http://localhost:5173/dungeon in browser
+  3. You should see the dungeon screen with your DNGN balance
+  4. If you have DNGN tokens, click Enter Dungeon → should show a loot item
+  ❌ If you see a blank page: open browser console (F12), check the red error
+  ❌ If "Cannot read property of undefined": a hook is returning undefined — 
+     check that usePlayerProfile().tba is not null
+  ❌ If the tx fails: check that wire.ts was run (DungeonDrops needs GAME_ROLE)
+
+
+--- SCREEN: HarvestField.tsx (pages/HarvestField.tsx) ---
+
+WHAT IT IS:
+  A staking game with 3 UI states. Player stakes HRV tokens, waits 100
+  blocks, then harvests for a reward + seasonal item.
+
+THE 3 UI STATES (show only ONE at a time):
+
+  State 1 — Not staking (stakes.amount == 0):
+    Show HRV balance, an amount input, and a "Stake" button.
+
+  State 2 — Staking, waiting (amount > 0 but currentBlock < stakedAtBlock + 100):
+    Show: staked amount, staked-at block, current block, progress bar
+    (blocksElapsed / 100), estimated reward, disabled Harvest button,
+    active Unstake button.
+    Poll publicClient.getBlockNumber() every 5 seconds to update progress.
+
+  State 3 — Ready to harvest (currentBlock >= stakedAtBlock + 100):
+    Harvest button is enabled (green). Show final reward estimate.
+
+WHAT CONTRACT FUNCTIONS YOU'LL CALL:
+  Reads:
+    - HarvestField.stakes(tba) → returns [amount, stakedAtBlock] as bigints
+    - HRV token balanceOf(tba) → use ADDRESSES.HarvestFieldToken
+    - publicClient.getBlockNumber() → current block number
+
+  Reward formula (compute in JS for display):
+    reward = (amount * 1e16 * blocksElapsed) / 1e18
+    where blocksElapsed = currentBlock - stakedAtBlock
+
+  Writes (all via useTBA().execute):
+    - stake(uint256 amount)
+    - harvest()        — no arguments
+    - unstake()        — no arguments
+
+HOW TO PROMPT YOUR AI:
+  Open ProfileDashboard.tsx + useTBA.ts + usePlayerProfile.ts first. Then:
+
+  "Build src/pages/HarvestField.tsx for a staking game. Look at
+  ProfileDashboard.tsx for the code patterns.
+
+  It has 3 states:
+  - No stake: show HRV balance + amount input + Stake button
+  - Staking: show progress bar (blocksElapsed / 100), staked amount,
+    estimated reward = (amount * 1e16 * blocksElapsed) / 1e18. Poll
+    getBlockNumber() every 5 seconds. Harvest button disabled. Unstake active.
+  - Ready: Harvest button enabled (green), show final reward.
+
+  Read stakes(tba) from HarvestField contract. Read HRV balance from
+  ADDRESSES.HarvestFieldToken. All writes go through useTBA().execute()
+  with encodeFunctionData using HarvestFieldABI.
+
+  Same Tailwind dark theme as ProfileDashboard. Use toast for success/error."
+
+VERIFY IT WORKS:
+  1. Navigate to /harvest
+  2. You should see your HRV balance and a stake form
+  3. If you stake tokens, the progress bar should appear and update
+  ❌ "Amount must be > 0": you need to enter a number
+  ❌ Progress bar stuck: check the 5-second poll interval is running
+
+
+--- SCREEN: DEX.tsx (pages/DEX.tsx) ---
+
+WHAT IT IS:
+  Token exchange. Players swap PXL for game tokens and back. Also has
+  pool info, liquidity management, and a bridge button.
+
+WHAT IT SHOWS:
+
+  Swap Form:
+    - Token selector dropdown: PXL, DNGN, HRV
+    - Amount input
+    - Estimated output (from dex.getPrice)
+    - Swap button
+
+  Pool Info (below the form):
+    - For each game: pool reserves (reservePXL, reserveGame)
+
+  Bridge Button:
+    - One button that calls openBridge from InterwovenKit. One line of code.
+
+IMPORTANT — gameId values:
+  Game IDs are NOT strings. They're keccak256 hashes (bytes32). The
+  constants.ts file already has these computed:
+    DUNGEON_GAME_ID = keccak256('DungeonDrops')
+    HARVEST_GAME_ID = keccak256('HarvestField')
+  Import them from lib/constants.ts.
+
+HOW SWAPS WORK (two transactions via useTBA):
+  Swap PXL → DNGN:
+    Step 1: approve PXL for DEX
+      calldata = encodeFunctionData({ abi: PXLTokenABI, functionName: 'approve', args: [ADDRESSES.PixelVaultDEX, amount] })
+      tba.execute(ADDRESSES.PXLToken, 0n, calldata)
+    Step 2: do the swap
+      calldata = encodeFunctionData({ abi: PixelVaultDEXABI, functionName: 'swapPXLForGame', args: [gameId, amount, minOut] })
+      tba.execute(ADDRESSES.PixelVaultDEX, 0n, calldata)
+
+  Swap DNGN → PXL:
+    Step 1: approve DNGN for DEX
+    Step 2: call swapGameForPXL
+
+WHAT CONTRACT FUNCTIONS YOU'LL CALL:
+  Reads:
+    - PixelVaultDEX.pools(gameId) → returns pool info including reservePXL, reserveGame
+    - PixelVaultDEX.getPrice(gameId) → returns spot price
+    - Token balanceOf(tba) for PXL, DNGN, HRV
+
+  Writes (via useTBA):
+    - ERC20 approve(spender, amount)
+    - swapPXLForGame(gameId, pxlAmountIn, minGameOut)
+    - swapGameForPXL(gameId, gameAmountIn, minPXLOut)
+    - addLiquidity(gameId, pxlAmount, maxGameAmount)  — optional, nice-to-have
+    - removeLiquidity(gameId, shareAmount)             — optional, nice-to-have
+
+HOW TO PROMPT YOUR AI:
+  "Build src/pages/DEX.tsx — a token swap page. Look at ProfileDashboard.tsx
+  for patterns.
+
+  Swap form: dropdown with PXL/DNGN/HRV, amount input, estimated output.
+  Use getPrice(gameId) for live rates. Import DUNGEON_GAME_ID and
+  HARVEST_GAME_ID from lib/constants.ts.
+
+  Swapping requires two TBA calls: first approve the token, then call the
+  swap function. Use useTBA().execute for both.
+
+  Show pool reserves from pools(gameId). Add a 'Bridge INIT' button that
+  calls openBridge({srcChainId:'initiation-2', srcDenom:'uinit'}) from
+  useInterwovenKit().
+
+  Same dark theme as ProfileDashboard."
+
+VERIFY IT WORKS:
+  1. Navigate to /dex
+  2. You should see token selector and pool reserves
+  3. Try swapping PXL → DNGN with a small amount
+  ❌ "Pool not active": the pool hasn't been initialized with liquidity yet.
+     The deployer needs to add initial liquidity via the wire script.
+  ❌ "Slippage exceeded": set minOut to 0 for testing, then add proper slippage later
+
+
+--- SCREEN: Marketplace.tsx (pages/Marketplace.tsx) ---
+
+WHAT IT IS:
+  Item trading. Players list ERC1155 items for sale. Buyers can pay in ANY
+  game token — the marketplace auto-swaps to PXL via DEX internally.
+
+WHAT IT SHOWS:
+  Browse tab:
+    - Grid of active listings. Each shows: item name, game origin, seller,
+      quantity, price in PXL. Buy button.
+  List tab:
+    - Player's inventory (ERC1155 items at TBA). Pick item, set price. List button.
+
+HOW TO READ LISTINGS:
+  1. Call Marketplace.nextListingId() → gives you the total count
+  2. Loop from 0 to count-1, call Marketplace.listings(id) for each
+  3. Each listing has: seller, collection, itemId, amount, priceInPXL, gameId, active
+  4. Only show listings where active == true
+
+HOW TO LIST AN ITEM (two TBA calls):
+  1. Approve: call setApprovalForAll(ADDRESSES.Marketplace, true) on the
+     item's asset collection (e.g., ADDRESSES.DungeonDropsAssets)
+  2. List: call Marketplace.listItem(collection, itemId, amount, priceInPXL, gameId)
+
+HOW TO BUY WITH PXL (two TBA calls):
+  1. Approve PXL: approve(ADDRESSES.Marketplace, totalPrice) on PXL token
+  2. Buy: Marketplace.buyItem(listingId, amount, ADDRESSES.PXLToken, totalPrice)
+
+FEE INFO:
+  2.5% fee taken from seller's proceeds. Buyer pays listed price.
+  Seller receives: price × 0.975.
+
+HOW TO PROMPT YOUR AI:
+  "Build src/pages/Marketplace.tsx. Look at ProfileDashboard.tsx for patterns.
+
+  Two tabs: Browse and List.
+
+  Browse: read nextListingId(), loop to read each listing. Show active ones
+  in a grid: item name (map itemId using constants), seller address (truncated),
+  quantity, price in PXL. Buy button does: approve PXL then buyItem, both
+  via useTBA.
+
+  List: show player's ERC1155 items at TBA (read balanceOf for each known
+  item type). Form: pick item, enter PXL price. Submit does:
+  setApprovalForAll on asset collection then listItem, both via useTBA.
+
+  Show 2.5% fee info. Same dark theme. Use toast for tx feedback."
+
+VERIFY IT WORKS:
+  1. Navigate to /marketplace
+  2. You should see an empty listings grid (no one has listed anything yet)
+  3. If you have items, try listing one
+  ❌ "ERC1155: caller is not token owner": you're calling from the wrong
+     address. Items are in the TBA — the TBA must call setApprovalForAll.
+
+
+--- SCREEN: GasSettings.tsx (pages/GasSettings.tsx) ---
+
+WHAT IT IS:
+  Shows that players paid gas in game tokens instead of PXL. Small screen
+  but judges love it — it demonstrates the GasPaymaster concept.
+
+WHAT IT SHOWS:
+  - Gas history table: past GasSponsored events for this player's TBA
+  - Each row: contract called (mapped to name), tokens paid, PXL equivalent, status
+  - Current exchange rates: 1 DNGN = X PXL, 1 HRV = X PXL
+  - Gas token preference toggle (UI only — stores in React state)
+
+WHAT CONTRACT FUNCTIONS YOU'LL CALL:
+  Reads:
+    - publicClient.getLogs with GasPaymaster address + GasSponsored event
+      Topic filter: playerTBA address in the indexed parameter
+    - PixelVaultDEX.getPrice(gameId) for exchange rates
+
+HOW TO PROMPT YOUR AI:
+  "Build src/pages/GasSettings.tsx. Look at ProfileDashboard.tsx for patterns.
+
+  Fetch GasSponsored event logs from GasPaymaster (ADDRESSES.GasPaymaster)
+  filtered to the player's TBA. Use publicClient.getLogs. Decode events to
+  show: contract called (map ADDRESSES to names like 'DungeonDrops'),
+  tokens provided, PXL received, success status.
+
+  Show exchange rates from PixelVaultDEX.getPrice for each game token.
+  Add a toggle for gas token preference (just stores in React state, no
+  contract call). Same dark theme. Render as a settings panel with a table."
+
+
+--- SCREEN: GameHub.tsx (pages/GameHub.tsx) ---
+
+WHAT IT IS:
+  Directory of all games. Shows ratings, trade volume, player counts.
+
+WHAT IT SHOWS:
+  - Game cards with: name, star rating (1-5), total volume, unique players, Play button
+  - Rating: GameRegistry.getGameRating(gameId) returns 100-500. Divide by 100 for stars.
+
+WHAT CONTRACT FUNCTIONS YOU'LL CALL:
+  Reads:
+    - GameRegistry.getGameCount() → number of games
+    - GameRegistry.gameIds(index) → gets gameId at index
+    - GameRegistry.games(gameId) → returns name, totalVolume, uniquePlayers, etc.
+    - GameRegistry.getGameRating(gameId) → rating 100-500
+
+HOW TO PROMPT YOUR AI:
+  "Build src/pages/GameHub.tsx. Look at ProfileDashboard.tsx for patterns.
+
+  Read getGameCount() from GameRegistry, then loop gameIds(i) for each,
+  then fetch games(gameId) and getGameRating(gameId). Render cards: game
+  name, star rating (100-500 mapped to 1-5 stars), formatted totalVolume,
+  uniquePlayers count, Play button linking to /dungeon or /harvest.
+  Same dark theme."
+
+
+================================================================================
+PHASE 4 — NATIVE INITIA FEATURES
+================================================================================
+
+--- 4A: Auto-signing (REQUIRED — already wired, just use it) ---
+
+The useAutoSign hook is already built. You just need to use it in screens:
+
+  In DungeonDrops.tsx:
+    - Import useAutoSign
+    - Show green "Auto-sign ON" badge if isSessionActive
+    - Show "Enable Auto-sign" button that calls grantSession()
+
+  In the app header (or Profile Dashboard):
+    - Show session status
+    - Toggle to grant/revoke session
+
+The session is scoped to the player's TBA address. Since ALL game actions go
+through the TBA, one session covers every game. Expires after 1 hour.
+
+
+--- 4B: Initia Usernames (nice-to-have) ---
+
+Wherever you show an address, try to resolve it to a .init username.
+InterwovenKit has a username resolution API. Build a small utility:
+
+  async function resolveUsername(address: string): Promise<string>
+    // Try InterwovenKit resolution
+    // Fall back to address.slice(0,6) + '...' + address.slice(-4)
+
+Cache results so you don't re-fetch.
+
+
+--- 4C: Bridge (one line of code) ---
+
+Already in the DEX screen prompt. It's literally:
+  const { openBridge } = useInterwovenKit()
+  openBridge({ srcChainId: 'initiation-2', srcDenom: 'uinit' })
+
+InterwovenKit provides the entire bridge UI. You just add a button.
+
+
+================================================================================
+PHASE 5 — POLISH
+Do this AFTER all screens work.
+================================================================================
+
+--- Security checklist ---
+
+  npx hardhat coverage
+  Check enterDungeon, buyItem, stake, harvest have >90% branch coverage.
+
+  Manual testing on live chain:
+  - Try depositing 0 tokens → should revert
+  - Try buying more items than listed → should revert
+  - Try harvesting before 100 blocks → should revert
+
+
+--- UX checklist (do ALL of these) ---
+
+  [ ] Loading skeletons on Profile Dashboard
+  [ ] Toast notifications for every tx: pending → confirmed → error
+  [ ] Inline form validation: insufficient balance, amount too low
+  [ ] Loot animation on DungeonDrops (500ms CSS transition)
+  [ ] Progress bar on HarvestField (updates every 5 sec)
+  [ ] Disable buttons while isPending is true
+  [ ] Mobile-responsive layout on key screens
+
+
+================================================================================
+PHASE 6 — PXL GAS TOKEN MIGRATION
+Do this LAST. After EVERYTHING works end-to-end.
+================================================================================
+
+This makes PXL the chain's actual gas token. It activates the core pitch:
+"players never hold gas tokens."
+
+DO NOT DO THIS until the full demo loop works. A broken migration kills
+everything with no easy undo.
+
+Steps:
+  1. In scripts/deploy.ts, change 'PXLToken' to 'PXLTokenInitia'
+  2. Redeploy: npx hardhat run scripts/deploy.ts --network minievm
+  3. Re-wire: npx hardhat run scripts/wire.ts --network minievm
+  4. Register PXL as fee denom using @initia/initia.js:
+     Send MsgUpdateEvmParams with fee_denom = 'evm/<PXLContractAddress>'
+     (no 0x prefix, lowercase hex)
+     Validator mnemonic: ~/.weave/config.json → system_keys.validator.mnemonic
+  5. Test: send a tx, verify gas was charged in PXL
+
+
+================================================================================
+PHASE 7 — SUBMISSION PACKAGE
+================================================================================
+
+--- .initia/submission.json ---
+
+{
+  "project_name": "PixelVault",
+  "repo_url": "https://github.com/Kumarutkarsh9470/INITIA_Hack",
+  "commit_sha": "<run: git rev-parse HEAD>",
+  "rollup_chain_id": "trying",
+  "deployed_address": "<ADDRESSES.PlayerProfile>",
+  "vm": "evm",
+  "native_feature": "auto-signing",
+  "core_logic_path": "pixelvault/contracts/Marketplace.sol",
+  "native_feature_frontend_path": "pixelvault/frontend/src/hooks/useAutoSign.ts",
+  "demo_video_url": "<record AFTER PXL migration>"
+}
+
+
+--- README.md ---
+
+  ## Initia Hackathon Submission
+  - **Project Name**: PixelVault
+
+  ### Project Overview
+  [3 sentences]
+
+  ### Custom Implementation
+  - TBA identity: NFT wallet holds all game assets across games
+  - GasPaymaster: pay gas in any game token, auto-swap to PXL
+  - Cross-game economy: shared DEX, game ratings from trade volume
+
+  ### Native Features
+  - Auto-signing: session keys scoped to TBA, play without wallet popups
+  - Initia Usernames: .init names throughout the UI
+  - Bridge: one-button L1 bridge via InterwovenKit
+
+  ### How to Run Locally
+  1. cd pixelvault && npm install
+  2. weave rollup start -d
+  3. npx hardhat run scripts/deploy.ts --network minievm && npx hardhat run scripts/wire.ts --network minievm
+  4. cd frontend && npm install && npm run dev
+
+  ### Market Understanding
+  PixelVault targets crypto-native gamers frustrated by wallet interruptions
+  and siloed game economies. Existing solutions like Treasure DAO aggregate
+  games but don't solve gas abstraction or portable identity. PixelVault's
+  moat is architectural: by making PXL the chain's fee token via
+  MsgUpdateEvmParams, gas abstraction happens at the infrastructure layer —
+  every game inherits it automatically. Only possible on Initia.
+
+
+--- Demo Video Script (90 seconds) ---
+
+Record this EXACT sequence. Each step maps to a scoring criterion.
+
+ 1. Connect wallet → Create profile "AliceGamer" → TBA address appears
+ 2. View Profile Dashboard — empty tokens, 0 reputation
+ 3. DEX → Swap 500 PXL for DNGN
+ 4. DungeonDrops → Click "Enter Dungeon" 3x rapidly, ZERO wallet popups
+    (THIS IS THE MOST IMPORTANT 10 SECONDS — shows auto-signing)
+ 5. Gas Settings → Show gas paid in DNGN, auto-converted to PXL
+ 6. Profile Dashboard → Badge earned, items in inventory, reputation up
+ 7. Marketplace → List Rare Shield for 200 PXL
+ 8. Second browser tab as "Bob" → Buy Shield with HRV tokens
+ 9. Show both profiles: Bob has shield, Alice has ~195 PXL (after fee)
+10. HarvestField → Stake HRV → mine blocks → Harvest → item + badge on profile
+
+TIP: Use two Chrome profiles (Alice + Bob). Don't disconnect/reconnect.
+
+
+================================================================================
+DEBUGGING — READ THIS WHEN THINGS BREAK
+================================================================================
+
+Things WILL break. This section tells you what to do.
+
+--- How to see errors ---
+
+  Browser console: F12 (or Cmd+Option+J on Mac) → Console tab
+  Terminal: look at the terminal where npm run dev is running
+
+  The browser console error is usually the most useful.
+
+
+--- The fix loop ---
+
+  1. Copy the EXACT error message from the console
+  2. Give it to your AI with context:
+     "I'm getting this error in my DungeonDrops.tsx component:
+      [PASTE ERROR]
+      Here is the component code: [PASTE YOUR FILE]
+      Here is useTBA.ts: [PASTE THE HOOK]
+      Fix the error."
+  3. Apply the fix, save, refresh the browser
+  4. Repeat until it works
+
+
+--- Common errors and what they mean ---
+
+  "Cannot read properties of undefined (reading 'xxx')"
+    → A hook returned undefined. Usually means usePlayerProfile() hasn't
+    loaded yet. Add a check: if (!tba) return <Loading />
+
+  "Contract function 'xxx' not found"
+    → Wrong ABI imported. Check that you're using the right ABI for the
+    right contract. DungeonDropsABI for DungeonDrops, not MarketplaceABI.
+
+  "Execution reverted"
+    → The contract rejected the call. Common reasons:
+    - "Already staking" → player already has a stake, can't stake again
+    - "No active stake" → trying to harvest/unstake without a stake
+    - "Pool not active" → DEX pool hasn't been initialized with liquidity
+    - "Insufficient balance" → TBA doesn't have enough tokens
+
+  "Invalid signer"
+    → The TBA is rejecting the call. This means the wallet calling execute()
+    doesn't own the NFT. Check that you're connected with the right wallet.
+
+  Blank page, no error
+    → Usually a missing import or export. Check that your component is
+    exported as default and that App.tsx imports it correctly.
+
+  "Module not found: '@initia/interwovenkit-react'"
+    → npm install wasn't run. cd frontend && npm install.
+
+
+--- Common code mistakes (will save you hours) ---
+
+  Token amounts have 18 decimals:
+    1 DNGN = 1000000000000000000n = BigInt(1e18)
+    If the user types "10" in an input, you need: parseEther("10")
+    For display, use: formatEther(balance) → shows "10.0"
+
+  gameId is bytes32, NOT a string:
+    Don't pass "DungeonDrops" to a contract expecting bytes32.
+    Use the pre-computed constants from lib/constants.ts:
+      import { DUNGEON_GAME_ID, HARVEST_GAME_ID } from '../lib/constants'
+
+  TBA address != PlayerProfile address:
+    Items are at the TBA. Tokens are at the TBA. Don't use the profile
+    contract address when checking balances.
+
+  ownerToTokenId returns 0 for wallets that never minted:
+    tokenId 0 IS valid (first player). Always check hasMinted() first.
+
+  msg.sender vs _msgSender():
+    Game contracts use _msgSender() because GasPaymaster does EIP-2771
+    forwarding. You don't need to worry about this in the frontend. Just
+    know it exists if you're reading contract code.
+
+  Never call game contracts directly:
+    Always go through useTBA().execute(). The TBA forwards the call.
+    Exception: PlayerProfile.mint() is called directly by the EOA.
+
+  PXLTokenInitia fee_denom format:
+    'evm/<address>' — no 0x prefix, lowercase hex.
+    Example: 'evm/5fbdb2315678afecb367f032d93f642f64180aa3'
+
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+--- Contract addresses (all from ADDRESSES object in lib/addresses.ts) ---
+
+  ADDRESSES.PXLToken
+  ADDRESSES.PlayerProfile
+  ADDRESSES.GameRegistry
+  ADDRESSES.PixelVaultDEX
+  ADDRESSES.GasPaymaster
+  ADDRESSES.Marketplace
+  ADDRESSES.AchievementBadge
+  ADDRESSES.CommonRelic
+  ADDRESSES.DungeonDrops
+  ADDRESSES.HarvestField
+  ADDRESSES.DungeonDropsToken     (the DNGN ERC20)
+  ADDRESSES.HarvestFieldToken     (the HRV ERC20)
+  ADDRESSES.DungeonDropsAssets    (the ERC1155 item collection)
+  ADDRESSES.HarvestFieldAssets    (the ERC1155 item collection)
+  ADDRESSES.ERC6551Registry
+  ADDRESSES.ERC6551Account
+
+
+--- Scoring criteria → What covers each one ---
+
+  Originality & Track Fit (20%)
+    TBA identity + GasPaymaster gas abstraction. README paragraph.
+
+  Technical Execution & Initia Integration (30%)
+    Live appchain, 12 contracts, auto-signing, bridge button.
+
+  Product Value & UX (20%)
+    Profile Dashboard, loot animation, progress bar, toasts.
+
+  Working Demo & Completeness (20%)
+    10-step demo script. README. submission.json.
+
+  Market Understanding (10%)
+    README Market Understanding paragraph.
+
+---
+
+The product isn't the games. The product is the player's profile and economy.
+Games are plugins. Build with that in mind.

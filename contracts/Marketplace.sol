@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -7,10 +7,19 @@ import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "./interfaces/IPixelVaultDEX.sol";
-import "./interfaces/IGameRegistry.sol";
 
-contract Marketplace is ERC2771Context, ReentrancyGuard {
+interface IPixelVaultDEX {
+    function getAmountIn(bytes32 gameId, uint256 pxlAmountOut) external view returns (uint256);
+    function swapGameForPXL(bytes32 gameId, uint256 gameAmountIn, uint256 minPXLOut) external returns (uint256);
+}
+
+interface IGameRegistry {
+    function isRegistered(address token) external view returns (bool);
+    function tokenToGame(address token) external view returns (bytes32);
+    function getGameRating(bytes32 gameId) external view returns (uint256);
+}
+
+contract Marketplace is ERC2771Context, ReentrancyGuard, IERC1155Receiver {
     using SafeERC20 for IERC20;
 
     struct Listing {
@@ -23,57 +32,38 @@ contract Marketplace is ERC2771Context, ReentrancyGuard {
         bool active;
     }
 
-    mapping(uint256 => Listing) public listings;
-    uint256 public nextListingId;
+    // --- ERC1155 RECEIVER HELPERS ---
+    function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC1155Receiver.onERC1155Received.selector;
+    }
 
-    uint256 public constant FEE_BPS = 250; // 2.5%
+    function onERC1155BatchReceived(address, address, uint256[] calldata, uint256[] calldata, bytes calldata) external pure returns (bytes4) {
+        return IERC1155Receiver.onERC1155BatchReceived.selector;
+    }
 
-    address public feeRecipient;
     IERC20 public immutable pxlToken;
     IPixelVaultDEX public immutable dex;
     IGameRegistry public immutable gameRegistry;
+    address public feeRecipient;
+    uint256 public constant FEE_BPS = 250; // 2.5%
+    uint256 public nextListingId;
+    mapping(uint256 => Listing) public listings;
 
-    event ItemListed(
-        uint256 indexed listingId,
-        address indexed seller,
-        address collection,
-        uint256 itemId,
-        uint256 amount,
-        uint256 priceInPXL
-    );
-    event ItemSold(
-        uint256 indexed listingId,
-        address indexed buyer,
-        address indexed seller,
-        uint256 amount,
-        uint256 totalPXL
-    );
-    event ItemCanceled(uint256 indexed listingId);
+    event ItemListed(uint256 indexed listingId, address indexed seller, address collection, uint256 itemId, uint256 amount, uint256 priceInPXL);
+    event ItemSold(uint256 indexed listingId, address buyer, address seller, uint256 amount, uint256 totalPXL);
+    event ListingCancelled(uint256 indexed listingId);
 
     constructor(
         address _pxlToken,
         address _dex,
         address _gameRegistry,
         address _feeRecipient,
-        address _trustedForwarder
-    ) ERC2771Context(_trustedForwarder) {
+        address _forwarder
+    ) ERC2771Context(_forwarder) {
         pxlToken = IERC20(_pxlToken);
         dex = IPixelVaultDEX(_dex);
         gameRegistry = IGameRegistry(_gameRegistry);
         feeRecipient = _feeRecipient;
-    }
-
-    // ERC-1155 receivers
-    function onERC1155Received(
-        address, address, uint256, uint256, bytes calldata
-    ) external pure returns (bytes4) {
-        return IERC1155Receiver.onERC1155Received.selector;
-    }
-
-    function onERC1155BatchReceived(
-        address, address, uint256[] calldata, uint256[] calldata, bytes calldata
-    ) external pure returns (bytes4) {
-        return IERC1155Receiver.onERC1155BatchReceived.selector;
     }
 
     function listItem(
@@ -82,13 +72,15 @@ contract Marketplace is ERC2771Context, ReentrancyGuard {
         uint256 amount,
         uint256 priceInPXL,
         bytes32 gameId
-    ) external {
-        address seller = _msgSender();
+    ) external nonReentrant {
+        require(amount > 0, "Amount must be > 0");
+        require(priceInPXL > 0, "Price must be > 0");
 
-        IERC1155(collection).safeTransferFrom(seller, address(this), itemId, amount, "");
+        IERC1155(collection).safeTransferFrom(_msgSender(), address(this), itemId, amount, "");
 
-        listings[nextListingId] = Listing({
-            seller: seller,
+        uint256 listingId = nextListingId++;
+        listings[listingId] = Listing({
+            seller: _msgSender(),
             collection: collection,
             itemId: itemId,
             amount: amount,
@@ -97,26 +89,19 @@ contract Marketplace is ERC2771Context, ReentrancyGuard {
             active: true
         });
 
-        emit ItemListed(nextListingId, seller, collection, itemId, amount, priceInPXL);
-        nextListingId++;
+        emit ItemListed(listingId, _msgSender(), collection, itemId, amount, priceInPXL);
     }
 
-    function cancelListing(uint256 listingId) external {
+    function cancelListing(uint256 listingId) external nonReentrant {
         Listing storage listing = listings[listingId];
-        require(listing.seller == _msgSender(), "Not seller");
         require(listing.active, "Not active");
+        require(listing.seller == _msgSender(), "Not seller");
 
         listing.active = false;
 
-        IERC1155(listing.collection).safeTransferFrom(
-            address(this),
-            listing.seller,
-            listing.itemId,
-            listing.amount,
-            ""
-        );
+        IERC1155(listing.collection).safeTransferFrom(address(this), _msgSender(), listing.itemId, listing.amount, "");
 
-        emit ItemCanceled(listingId);
+        emit ListingCancelled(listingId);
     }
 
     function buyItem(
@@ -127,49 +112,48 @@ contract Marketplace is ERC2771Context, ReentrancyGuard {
     ) external nonReentrant {
         Listing storage listing = listings[listingId];
         require(listing.active, "Not active");
-        require(amount > 0 && amount <= listing.amount, "Invalid amount");
+        require(amount <= listing.amount, "Not enough stock");
 
-        address buyer = _msgSender();
         uint256 totalPXL = listing.priceInPXL * amount;
 
         if (paymentToken == address(pxlToken)) {
-            // Pay in PXL directly
-            pxlToken.safeTransferFrom(buyer, address(this), totalPXL);
+            pxlToken.safeTransferFrom(_msgSender(), address(this), totalPXL);
         } else {
-            // Pay with game token — swap via DEX
-            bytes32 paymentGameId = gameRegistry.tokenToGame(paymentToken);
-            require(paymentGameId != bytes32(0), "Invalid payment token");
+            uint256 amountIn = dex.getAmountIn(listing.gameId, totalPXL);
+            require(amountIn <= maxPayment, "Slippage too high");
 
-            uint256 gameAmountNeeded = dex.getAmountIn(paymentGameId, totalPXL);
-            require(gameAmountNeeded <= maxPayment, "Slippage exceeded");
+            IERC20(paymentToken).safeTransferFrom(_msgSender(), address(this), amountIn);
+            IERC20(paymentToken).approve(address(dex), amountIn);
 
-            IERC20(paymentToken).safeTransferFrom(buyer, address(this), gameAmountNeeded);
-            IERC20(paymentToken).approve(address(dex), gameAmountNeeded);
-            dex.swapGameForPXL(paymentGameId, gameAmountNeeded, totalPXL);
+            dex.swapGameForPXL(listing.gameId, amountIn, totalPXL);
         }
 
-        // Fee + payment to seller
         uint256 fee = (totalPXL * FEE_BPS) / 10000;
         pxlToken.safeTransfer(feeRecipient, fee);
         pxlToken.safeTransfer(listing.seller, totalPXL - fee);
 
-        // Update listing
         listing.amount -= amount;
-        if (listing.amount == 0) {
-            listing.active = false;
-        }
+        if (listing.amount == 0) listing.active = false;
 
-        // Send item to buyer
-        IERC1155(listing.collection).safeTransferFrom(
-            address(this),
-            buyer,
-            listing.itemId,
-            amount,
-            ""
-        );
+        IERC1155(listing.collection).safeTransferFrom(address(this), _msgSender(), listing.itemId, amount, "");
 
-        emit ItemSold(listingId, buyer, listing.seller, amount, totalPXL);
+        emit ItemSold(listingId, _msgSender(), listing.seller, amount, totalPXL);
     }
 
+    // --- DIAMOND INHERITANCE OVERRIDES ---
+    function _msgSender() internal view override returns (address) {
+        return ERC2771Context._msgSender();
+    }
 
+    function _msgData() internal view override returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view override returns (uint256) {
+        return ERC2771Context._contextSuffixLength();
+    }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(IERC1155Receiver).interfaceId;
+    }
 }

@@ -6,5 +6,4 @@ typechain-types
 coverage
 coverage.json
 dist
-deployed-addresses.json
 *.backup
