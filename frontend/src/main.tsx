@@ -32,7 +32,7 @@ const cosmosRest = `${origin}/cosmos-rest`
 
 // Define PixelVault MiniEVM as a viem/wagmi chain
 const pixelvaultChain = defineChain({
-  id: 2891653883154692,
+  id: Number(import.meta.env.VITE_CHAIN_ID ?? 2891653883154692),
   name: 'PixelVault Appchain',
   nativeCurrency: {
     name: import.meta.env.VITE_NATIVE_SYMBOL ?? 'GAS',

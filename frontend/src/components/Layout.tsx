@@ -8,7 +8,6 @@ const NAV_ITEMS = [
   { to: '/games', label: 'Games' },
   { to: '/dex', label: 'DEX' },
   { to: '/marketplace', label: 'Market' },
-  { to: '/gas', label: 'Gas' },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {

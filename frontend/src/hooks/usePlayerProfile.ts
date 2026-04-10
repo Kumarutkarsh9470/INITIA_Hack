@@ -142,6 +142,39 @@ export function usePlayerProfile(): PlayerProfileData {
 
       // Refetch profile after mint
       await fetchProfile()
+
+      // Auto-fund TBA with starter tokens via faucet API
+      try {
+        // fetchProfile just ran, so we read the TBA from the chain directly
+        const chainId = await publicClient.getChainId()
+        const hex = AccAddress.toHex(initiaAddress)
+        const ownerAddr = (hex.startsWith('0x') ? hex : `0x${hex}`) as `0x${string}`
+        const tid = await publicClient.readContract({
+          address: contracts.playerProfile.address,
+          abi: contracts.playerProfile.abi,
+          functionName: 'ownerToTokenId',
+          args: [ownerAddr],
+        }) as bigint
+        const tbaAddr = await publicClient.readContract({
+          address: contracts.erc6551Registry.address,
+          abi: contracts.erc6551Registry.abi,
+          functionName: 'account',
+          args: [
+            ADDRESSES.ERC6551Account,
+            '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+            BigInt(chainId),
+            ADDRESSES.PlayerProfile,
+            tid,
+          ],
+        }) as `0x${string}`
+        await fetch('/api/faucet', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tba: tbaAddr }),
+        })
+      } catch (faucetErr) {
+        console.warn('Auto-faucet failed (tokens can be claimed later):', faucetErr)
+      }
     },
     [initiaAddress, requestTxBlock, fetchProfile],
   )

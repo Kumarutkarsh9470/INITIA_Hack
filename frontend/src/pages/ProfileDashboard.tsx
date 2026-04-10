@@ -17,6 +17,7 @@ export default function ProfileDashboard() {
   const [harvestItems, setHarvestItems] = useState<Record<number, bigint>>({})
   const [badges, setBadges] = useState<Record<number, bigint>>({})
   const [isLoadingData, setIsLoadingData] = useState(true)
+  const [isClaiming, setIsClaiming] = useState(false)
 
   useEffect(() => {
     if (!tba) return
@@ -129,6 +130,40 @@ export default function ProfileDashboard() {
           </p>
         </div>
       </div>
+
+      {/* Faucet claim banner — shown when all balances are zero */}
+      {!isLoadingData && pxlBalance === 0n && dngnBalance === 0n && hrvBalance === 0n && tba && (
+        <div className="card p-5 border-brand-200 bg-brand-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-surface-900">No tokens yet?</p>
+            <p className="text-xs text-surface-500 mt-0.5">Claim free starter tokens — 10,000 PXL · 500 DNGN · 500 HRV</p>
+          </div>
+          <button
+            onClick={async () => {
+              setIsClaiming(true)
+              try {
+                const res = await fetch('/api/faucet', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tba }),
+                })
+                const json = await res.json()
+                if (!res.ok) throw new Error(json.error || 'Faucet failed')
+                toast.success('Starter tokens sent! Refreshing…')
+                setTimeout(() => window.location.reload(), 2000)
+              } catch (err: any) {
+                toast.error(err?.message || 'Failed to claim tokens')
+              } finally {
+                setIsClaiming(false)
+              }
+            }}
+            disabled={isClaiming}
+            className="btn-primary px-5 py-2.5 text-sm whitespace-nowrap disabled:opacity-50"
+          >
+            {isClaiming ? 'Sending…' : 'Claim Starter Tokens'}
+          </button>
+        </div>
+      )}
 
       {/* Token Balances */}
       <div className="card p-6">
