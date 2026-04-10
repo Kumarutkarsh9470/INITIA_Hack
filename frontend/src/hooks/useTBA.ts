@@ -7,7 +7,7 @@ import { usePlayerProfile } from './usePlayerProfile'
 const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID
 
 interface TBAActions {
-  execute: (target: `0x${string}`, value: bigint, calldata: `0x${string}`) => Promise<void>
+  execute: (target: `0x${string}`, value: bigint, calldata: `0x${string}`) => Promise<any>
   isPending: boolean
 }
 
@@ -26,7 +26,7 @@ export function useTBA(): TBAActions {
   const [isPending, setIsPending] = useState(false)
 
   const execute = useCallback(
-    async (target: `0x${string}`, value: bigint, calldata: `0x${string}`) => {
+    async (target: `0x${string}`, value: bigint, calldata: `0x${string}`): Promise<any> => {
       if (!initiaAddress || !tba) throw new Error('No profile or wallet')
 
       // Encode: tba.execute(target, value, calldata, 0)
@@ -38,7 +38,7 @@ export function useTBA(): TBAActions {
 
       setIsPending(true)
       try {
-        await requestTxBlock({
+        const result = await requestTxBlock({
           chainId: CHAIN_ID,
           messages: [
             {
@@ -54,6 +54,7 @@ export function useTBA(): TBAActions {
             },
           ],
         })
+        return result
       } finally {
         setIsPending(false)
       }

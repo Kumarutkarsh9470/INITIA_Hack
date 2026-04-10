@@ -2,6 +2,14 @@
 export const DUNGEON_GAME_ID = '0x8a7faac11b689a5f91556fc9d00fefebcd250de9c9f98f764e8d91ef11653098' as `0x${string}`
 export const HARVEST_GAME_ID = '0xa97480cebb0845f01cfdff40d4ecb12b5ad61dc0c8763e8fe6596d9648937609' as `0x${string}`
 
+// Lookup table: token symbol → game ID (used by DEX, Marketplace, etc.)
+export const GAME_IDS: Record<string, `0x${string}`> = {
+  DNGN: DUNGEON_GAME_ID,
+  HRV: HARVEST_GAME_ID,
+  DUNGEON: DUNGEON_GAME_ID,
+  HARVEST: HARVEST_GAME_ID,
+}
+
 // ERC1155 item IDs for DungeonDrops
 export const DUNGEON_ITEMS: Record<number, string> = {
   1: 'Common Sword',

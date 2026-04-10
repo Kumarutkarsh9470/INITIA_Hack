@@ -18,10 +18,11 @@ import {
   ERC6551RegistryABI,
 } from '../lib/abis'
 
-const JSON_RPC_URL = import.meta.env.VITE_JSON_RPC_URL ?? 'http://localhost:8545'
+const JSON_RPC_URL = import.meta.env.VITE_JSON_RPC_URL ?? `${window.location.origin}/evm-rpc`
 
 export const publicClient = createPublicClient({
   transport: http(JSON_RPC_URL),
+  batch: { multicall: true },
 })
 
 interface Contracts {
@@ -29,6 +30,7 @@ interface Contracts {
   pxlToken: { address: `0x${string}`; abi: typeof PXLTokenABI }
   gameRegistry: { address: `0x${string}`; abi: typeof GameRegistryABI }
   dex: { address: `0x${string}`; abi: typeof PixelVaultDEXABI }
+  pixelVaultDEX: { address: `0x${string}`; abi: typeof PixelVaultDEXABI }
   gasPaymaster: { address: `0x${string}`; abi: typeof GasPaymasterABI }
   marketplace: { address: `0x${string}`; abi: typeof MarketplaceABI }
   achievementBadge: { address: `0x${string}`; abi: typeof AchievementBadgeABI }
@@ -50,6 +52,7 @@ export function useContracts(): Contracts {
       pxlToken: { address: ADDRESSES.PXLToken, abi: PXLTokenABI },
       gameRegistry: { address: ADDRESSES.GameRegistry, abi: GameRegistryABI },
       dex: { address: ADDRESSES.PixelVaultDEX, abi: PixelVaultDEXABI },
+      pixelVaultDEX: { address: ADDRESSES.PixelVaultDEX, abi: PixelVaultDEXABI },
       gasPaymaster: { address: ADDRESSES.GasPaymaster, abi: GasPaymasterABI },
       marketplace: { address: ADDRESSES.Marketplace, abi: MarketplaceABI },
       achievementBadge: { address: ADDRESSES.AchievementBadge, abi: AchievementBadgeABI },

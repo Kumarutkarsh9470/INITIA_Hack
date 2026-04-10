@@ -1,5 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ProfileGate } from './components/ProfileGate'
+import Layout from './components/Layout'
 import Landing from './pages/Landing'
 import CreateProfile from './pages/CreateProfile'
 import ProfileDashboard from './pages/ProfileDashboard'
@@ -10,67 +11,27 @@ import Marketplace from './pages/Marketplace'
 import GasSettings from './pages/GasSettings'
 import GameHub from './pages/GameHub'
 
+function ProtectedPage({ children }: { children: React.ReactNode }) {
+  return (
+    <ProfileGate>
+      <Layout>{children}</Layout>
+    </ProfileGate>
+  )
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/create-profile" element={<CreateProfile />} />
-      <Route
-        path="/profile"
-        element={
-          <ProfileGate>
-            <ProfileDashboard />
-          </ProfileGate>
-        }
-      />
-      <Route
-        path="/dungeon"
-        element={
-          <ProfileGate>
-            <DungeonDrops />
-          </ProfileGate>
-        }
-      />
-      <Route
-        path="/harvest"
-        element={
-          <ProfileGate>
-            <HarvestField />
-          </ProfileGate>
-        }
-      />
-      <Route
-        path="/dex"
-        element={
-          <ProfileGate>
-            <DEX />
-          </ProfileGate>
-        }
-      />
-      <Route
-        path="/marketplace"
-        element={
-          <ProfileGate>
-            <Marketplace />
-          </ProfileGate>
-        }
-      />
-      <Route
-        path="/gas"
-        element={
-          <ProfileGate>
-            <GasSettings />
-          </ProfileGate>
-        }
-      />
-      <Route
-        path="/games"
-        element={
-          <ProfileGate>
-            <GameHub />
-          </ProfileGate>
-        }
-      />
+      <Route path="/profile" element={<ProtectedPage><ProfileDashboard /></ProtectedPage>} />
+      <Route path="/dungeon" element={<ProtectedPage><DungeonDrops /></ProtectedPage>} />
+      <Route path="/harvest" element={<ProtectedPage><HarvestField /></ProtectedPage>} />
+      <Route path="/dex" element={<ProtectedPage><DEX /></ProtectedPage>} />
+      <Route path="/marketplace" element={<ProtectedPage><Marketplace /></ProtectedPage>} />
+      <Route path="/gas" element={<ProtectedPage><GasSettings /></ProtectedPage>} />
+      <Route path="/games" element={<ProtectedPage><GameHub /></ProtectedPage>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

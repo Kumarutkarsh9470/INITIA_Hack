@@ -1,6 +1,6 @@
 import { Buffer } from 'buffer'
 ;(window as any).Buffer = Buffer
-;(window as any).process = { env: { NODE_ENV: 'development' } }
+;(window as any).process = { env: { NODE_ENV: import.meta.env.MODE } }
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
@@ -12,7 +12,7 @@ import {
 } from '@initia/interwovenkit-react'
 import InterwovenKitStyles from '@initia/interwovenkit-react/styles.js'
 import { WagmiProvider, createConfig, http } from 'wagmi'
-import { mainnet } from 'wagmi/chains'
+import { defineChain } from 'viem'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
@@ -22,9 +22,33 @@ import './index.css'
 injectStyles(InterwovenKitStyles)
 
 const queryClient = new QueryClient()
+
+// All API calls go through Vite's dev server proxy to avoid CORS.
+// InterwovenKit requires absolute URLs, so prefix with window.location.origin.
+const origin = window.location.origin
+const evmRpc = import.meta.env.VITE_JSON_RPC_URL ?? `${origin}/evm-rpc`
+const cosmosRpc = `${origin}/cosmos-rpc`
+const cosmosRest = `${origin}/cosmos-rest`
+
+// Define PixelVault MiniEVM as a viem/wagmi chain
+const pixelvaultChain = defineChain({
+  id: 2891653883154692,
+  name: 'PixelVault Appchain',
+  nativeCurrency: {
+    name: import.meta.env.VITE_NATIVE_SYMBOL ?? 'GAS',
+    symbol: import.meta.env.VITE_NATIVE_SYMBOL ?? 'GAS',
+    decimals: Number(import.meta.env.VITE_NATIVE_DECIMALS ?? 18),
+  },
+  rpcUrls: {
+    default: {
+      http: [evmRpc],
+    },
+  },
+})
+
 const wagmiConfig = createConfig({
-  chains: [mainnet],
-  transports: { [mainnet.id]: http() },
+  chains: [pixelvaultChain],
+  transports: { [pixelvaultChain.id]: http(evmRpc) },
 })
 
 const customChain = {
@@ -38,10 +62,10 @@ const customChain = {
     svg: 'https://raw.githubusercontent.com/initia-labs/initia-registry/main/testnets/initia/images/initia.svg',
   },
   apis: {
-    rpc: [{ address: 'http://localhost:26657' }],
-    rest: [{ address: 'http://localhost:1317' }],
-    indexer: [{ address: 'http://localhost:8080' }],
-    'json-rpc': [{ address: import.meta.env.VITE_JSON_RPC_URL ?? 'http://localhost:8545' }],
+    rpc: [{ address: cosmosRpc }],
+    rest: [{ address: cosmosRest }],
+    indexer: [{ address: `${origin}/cosmos-rest` }],
+    'json-rpc': [{ address: evmRpc }],
   },
   fees: {
     fee_tokens: [
@@ -86,9 +110,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               position="bottom-right"
               toastOptions={{
                 style: {
-                  background: '#1f2937',
-                  color: '#f9fafb',
-                  border: '1px solid #374151',
+                  background: '#ffffff',
+                  color: '#212529',
+                  border: '1px solid #e9ecef',
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.06)',
+                  borderRadius: '12px',
+                  fontSize: '14px',
                 },
               }}
             />
