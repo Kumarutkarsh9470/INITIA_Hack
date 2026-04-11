@@ -103,6 +103,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           {...TESTNET}
           defaultChainId={customChain.chain_id}
           customChain={customChain}
+          enableAutoSign={true}
         >
           <BrowserRouter>
             <App />

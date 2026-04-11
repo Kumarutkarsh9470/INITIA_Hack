@@ -140,6 +140,7 @@ export default function HarvestField() {
         <div>
           <h1 className="page-title">Harvest Field</h1>
           <p className="text-surface-500 text-sm mt-0.5">Stake HRV for 100 blocks to earn rewards</p>
+          <p className="text-xs text-surface-400 mt-1 italic">Demo game — in production, this is a farming simulation with 3D fields. The staking/harvest contract calls are identical.</p>
         </div>
         <div className="card px-4 py-2 text-right">
           <p className="stat-label">Balance</p>

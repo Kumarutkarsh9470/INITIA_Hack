@@ -10,6 +10,7 @@ import DEX from './pages/DEX'
 import Marketplace from './pages/Marketplace'
 import GasSettings from './pages/GasSettings'
 import GameHub from './pages/GameHub'
+import SDKDocs from './pages/SDKDocs'
 
 function ProtectedPage({ children }: { children: React.ReactNode }) {
   return (
@@ -31,6 +32,7 @@ export default function App() {
       <Route path="/marketplace" element={<ProtectedPage><Marketplace /></ProtectedPage>} />
       <Route path="/gas" element={<ProtectedPage><GasSettings /></ProtectedPage>} />
       <Route path="/games" element={<ProtectedPage><GameHub /></ProtectedPage>} />
+      <Route path="/sdk" element={<ProtectedPage><SDKDocs /></ProtectedPage>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

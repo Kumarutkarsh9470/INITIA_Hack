@@ -1,38 +1,31 @@
-import { useState, useCallback } from 'react'
+import { useMemo } from 'react'
 import { useInterwovenKit } from '@initia/interwovenkit-react'
-import { usePlayerProfile } from './usePlayerProfile'
+
+const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID
 
 /**
- * Wraps InterwovenKit session key functionality.
- * When a session is active, transactions auto-sign without wallet popups.
- * Session is scoped to the TBA address and expires after 1 hour.
+ * Checks whether InterwovenKit auto-sign is currently active for the app chain.
+ * When enabled, transactions matching allowed typeUrls (MsgCall) sign automatically
+ * without wallet popup. Users enable/disable auto-sign from the wallet drawer.
+ *
+ * To toggle: call openWallet() — the wallet drawer has an auto-sign section.
  */
 export function useAutoSign() {
-  const { requestSession, revokeSession: revokeKit } = useInterwovenKit() as any
-  const { tba } = usePlayerProfile()
-  const [isSessionActive, setIsSessionActive] = useState(false)
+  const { autoSign, openWallet } = useInterwovenKit() as any
 
-  const grantSession = useCallback(async () => {
+  // Check if auto-sign is active by testing with a dummy MsgCall
+  const isSessionActive = useMemo(() => {
+    if (!autoSign || typeof autoSign !== 'function') return false
     try {
-      await requestSession?.()
-      setIsSessionActive(true)
-    } catch (error) {
-      console.error('Failed to grant session:', error)
+      return autoSign(CHAIN_ID, [{ typeUrl: '/minievm.evm.v1.MsgCall' }])
+    } catch {
+      return false
     }
-  }, [requestSession])
-
-  const revokeSession = useCallback(async () => {
-    try {
-      await revokeKit?.()
-      setIsSessionActive(false)
-    } catch (error) {
-      console.error('Failed to revoke session:', error)
-    }
-  }, [revokeKit])
+  }, [autoSign])
 
   return {
-    grantSession,
+    grantSession: openWallet, // Opens wallet drawer where user can enable auto-sign
     isSessionActive,
-    revokeSession,
+    revokeSession: openWallet, // Opens wallet drawer where user can disable auto-sign
   }
 }

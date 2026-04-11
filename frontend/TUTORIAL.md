@@ -18,26 +18,7 @@ After connecting, you land on the **Create Profile** page.
 
 > All in-game assets, tokens, and items are owned by your TBA, not your EOA directly.
 
----
 
-## 3. Get Starter Tokens (Faucet)
-
-**Why everything is zero:** Your TBA starts with no tokens. You need to airdrop tokens to your TBA to begin.
-
-Run this command from the project root (replace the address with **your TBA address** shown on the Dashboard):
-
-```bash
-TBA_ADDRESS=0xYourTBAHere npx hardhat run scripts/faucet.ts --network minievm
-```
-
-This sends:
-- **10,000 PXL** — the platform currency
-- **500 DNGN** — Dungeon Drops game token
-- **500 HRV** — Harvest Field game token
-
-After the faucet runs, refresh the Dashboard to see your balances.
-
----
 
 ## 4. Dashboard
 

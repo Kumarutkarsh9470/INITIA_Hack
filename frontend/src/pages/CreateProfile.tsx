@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInterwovenKit } from '@initia/interwovenkit-react'
+import { AccAddress } from '@initia/initia.js'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
+import { publicClient } from '../hooks/useContracts'
 import toast from 'react-hot-toast'
 
 export default function CreateProfile() {
@@ -10,6 +12,7 @@ export default function CreateProfile() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [isMinting, setIsMinting] = useState(false)
+  const [mintStatus, setMintStatus] = useState('')
 
   useEffect(() => {
     if (!isLoading && hasProfile) {
@@ -25,6 +28,29 @@ export default function CreateProfile() {
 
     setIsMinting(true)
     try {
+      // Step 1: Ensure the account has native GAS to pay for the mint transaction
+      setMintStatus('Checking account...')
+      const hex = AccAddress.toHex(initiaAddress!)
+      const evmAddress = (hex.startsWith('0x') ? hex : `0x${hex}`) as `0x${string}`
+      const balance = await publicClient.getBalance({ address: evmAddress })
+
+      if (balance === 0n) {
+        setMintStatus('Funding account with GAS...')
+        const fundRes = await fetch('/api/fund-gas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: evmAddress }),
+        })
+        if (!fundRes.ok) {
+          const err = await fundRes.json().catch(() => ({}))
+          throw new Error(err.error || 'Failed to fund account with GAS')
+        }
+        // Brief wait for the chain to process
+        await new Promise(r => setTimeout(r, 1500))
+      }
+
+      // Step 2: Mint profile
+      setMintStatus('Minting profile NFT...')
       await mint(username)
       toast.success('Profile created!')
       navigate('/profile')
@@ -33,6 +59,7 @@ export default function CreateProfile() {
       toast.error(error?.message?.slice(0, 100) || 'Failed to create profile')
     } finally {
       setIsMinting(false)
+      setMintStatus('')
     }
   }
 
@@ -73,7 +100,7 @@ export default function CreateProfile() {
               disabled={isMinting || isLoading}
               className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isMinting ? 'Creating...' : 'Mint Profile NFT'}
+              {isMinting ? (mintStatus || 'Creating...') : 'Mint Profile NFT'}
             </button>
           </>
         )}

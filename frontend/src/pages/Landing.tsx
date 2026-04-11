@@ -5,28 +5,28 @@ import { useEffect } from 'react'
 
 const FEATURES = [
   {
-    title: 'Player Identity',
-    desc: 'Mint an NFT profile with a Token Bound Account — one wallet for all games.',
+    title: 'Player Identity (TBA)',
+    desc: 'Mint an NFT profile with a Token Bound Account — one smart-contract wallet for all games.',
   },
   {
     title: 'Cross-Game Economy',
-    desc: 'Items and tokens earned in any game live in your TBA. Trade freely on the marketplace.',
+    desc: 'Items and tokens earned in any game live in your TBA. Trade freely on the shared marketplace.',
   },
   {
-    title: 'Built-in DEX',
-    desc: 'Swap game tokens with a constant-product AMM. Add liquidity and earn fees.',
+    title: 'Game Developer SDK',
+    desc: 'Register your game, get ERC-20 tokens and ERC-1155 items deployed automatically. Read/write state with simple calls.',
   },
   {
     title: 'Gas Abstraction',
-    desc: 'Pay gas with any game token — the Paymaster auto-swaps behind the scenes.',
+    desc: 'Pay gas with any game token — the Paymaster auto-swaps behind the scenes via the DEX.',
   },
   {
     title: 'P2P Marketplace',
     desc: 'List and buy ERC-1155 game items across games. 2.5% fee supports the ecosystem.',
   },
   {
-    title: 'Soulbound Badges',
-    desc: 'Earn non-transferable achievement badges. Your on-chain reputation grows over time.',
+    title: 'On-Chain Achievements',
+    desc: 'Earn soulbound badges per game. Your reputation score grows as you play across the ecosystem.',
   },
 ]
 

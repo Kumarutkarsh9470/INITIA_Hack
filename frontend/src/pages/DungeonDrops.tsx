@@ -65,6 +65,25 @@ export default function DungeonDrops() {
     setShowLoot(false)
     setLootItemId(null)
     try {
+      // Step 1: Check allowance and approve DungeonDrops to pull DNGN from TBA
+      const allowance = await publicClient.readContract({
+        address: contracts.dungeonDropsToken.address,
+        abi: contracts.dungeonDropsToken.abi,
+        functionName: 'allowance',
+        args: [tba, ADDRESSES.DungeonDrops],
+      }) as bigint
+
+      if (allowance < DUNGEON_ENTRY_FEE) {
+        // Approve 100 runs worth (1000 DNGN) so user doesn't need to re-approve every time
+        const approveData = encodeFunctionData({
+          abi: contracts.dungeonDropsToken.abi,
+          functionName: 'approve',
+          args: [ADDRESSES.DungeonDrops, DUNGEON_ENTRY_FEE * 100n],
+        })
+        await execute(contracts.dungeonDropsToken.address, 0n, approveData)
+      }
+
+      // Step 2: Enter the dungeon
       const calldata = encodeFunctionData({ abi: contracts.dungeonDrops.abi, functionName: 'enterDungeon', args: [] })
       const receipt = await execute(ADDRESSES.DungeonDrops, 0n, calldata)
 
@@ -112,6 +131,7 @@ export default function DungeonDrops() {
       <div>
         <h1 className="page-title">Dungeon Drops</h1>
         <p className="text-surface-500 text-sm mt-1">Pay 10 DNGN to enter and roll for loot</p>
+        <p className="text-xs text-surface-400 mt-1 italic">Demo game — in production, this logic runs inside a Unity/Unreal dungeon crawler. Same smart contract calls, visual gameplay on top.</p>
       </div>
 
       {/* Stats */}

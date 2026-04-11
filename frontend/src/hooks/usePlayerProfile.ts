@@ -140,12 +140,13 @@ export function usePlayerProfile(): PlayerProfileData {
         ],
       })
 
-      // Refetch profile after mint
+      // Refetch profile after mint to get TBA address
       await fetchProfile()
 
       // Auto-fund TBA with starter tokens via faucet API
       try {
-        // fetchProfile just ran, so we read the TBA from the chain directly
+        // Read the TBA from the chain directly (fetchProfile already populated state,
+        // but we read again to get the value synchronously for this closure)
         const chainId = await publicClient.getChainId()
         const hex = AccAddress.toHex(initiaAddress)
         const ownerAddr = (hex.startsWith('0x') ? hex : `0x${hex}`) as `0x${string}`
@@ -167,13 +168,19 @@ export function usePlayerProfile(): PlayerProfileData {
             tid,
           ],
         }) as `0x${string}`
-        await fetch('/api/faucet', {
+        const faucetRes = await fetch('/api/faucet', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tba: tbaAddr }),
         })
+        if (!faucetRes.ok) {
+          const errBody = await faucetRes.json().catch(() => ({}))
+          console.error('Auto-faucet returned error:', faucetRes.status, errBody)
+        } else {
+          console.log('Auto-faucet sent starter tokens to', tbaAddr)
+        }
       } catch (faucetErr) {
-        console.warn('Auto-faucet failed (tokens can be claimed later):', faucetErr)
+        console.error('Auto-faucet failed (tokens can be claimed from Dashboard):', faucetErr)
       }
     },
     [initiaAddress, requestTxBlock, fetchProfile],

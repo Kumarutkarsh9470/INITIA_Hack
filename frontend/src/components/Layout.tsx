@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/games', label: 'Games' },
   { to: '/dex', label: 'DEX' },
   { to: '/marketplace', label: 'Market' },
+  { to: '/sdk', label: 'SDK' },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -58,14 +59,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {isSessionActive ? (
               <button
                 onClick={revokeSession}
+                title="Auto-sign is active — transactions sign without popups. Click to manage."
                 className="hidden sm:flex items-center gap-1.5 text-emerald-600 text-xs font-medium hover:text-emerald-700 transition-colors"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Auto-sign
+                Auto-sign on
               </button>
             ) : (
               <button
                 onClick={grantSession}
+                title="Enable auto-sign to skip wallet popups for transactions"
                 className="hidden sm:flex items-center gap-1.5 text-surface-400 text-xs font-medium hover:text-surface-600 transition-colors"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-surface-300" />

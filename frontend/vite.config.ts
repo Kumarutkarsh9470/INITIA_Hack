@@ -10,13 +10,78 @@ dotenvConfig({ path: path.resolve(__dirname, '..', '.env') })
 
 /**
  * Vite plugin: in-process faucet API.
+ *
  * POST /api/faucet  { "tba": "0x..." }
- * Sends 10 000 PXL + 500 DNGN + 500 HRV from the deployer to the TBA.
+ *   → Sends 10 000 PXL + 500 DNGN + 500 HRV from the deployer to the TBA.
+ *
+ * POST /api/fund-gas  { "address": "0x..." }
+ *   → Sends a small amount of native GAS so new accounts can exist on-chain
+ *     and pay for their first transaction (profile mint).
  */
 function faucetPlugin(): Plugin {
   return {
     name: 'faucet-api',
     configureServer(server) {
+
+      // ── /api/fund-gas — send native GAS to a new EVM address ──
+      server.middlewares.use('/api/fund-gas', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.writeHead(405, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'POST only' }))
+          return
+        }
+
+        const chunks: Buffer[] = []
+        for await (const chunk of req) chunks.push(chunk as Buffer)
+        let address: string
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString())
+          address = body.address
+          if (!address || !address.startsWith('0x') || address.length !== 42) throw new Error('bad')
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Send { "address": "0x..." }' }))
+          return
+        }
+
+        try {
+          const { createWalletClient, createPublicClient, http, parseEther } = await import('viem')
+          const { privateKeyToAccount } = await import('viem/accounts')
+
+          const pk = process.env.VITE_DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY
+          if (!pk) {
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'No deployer key configured' }))
+            return
+          }
+
+          const rpcUrl = process.env.MINIEVM_RPC_URL || 'http://localhost:8545'
+          const transport = http(rpcUrl)
+          const account = privateKeyToAccount(pk as `0x${string}`)
+          const pub = createPublicClient({ transport })
+          const chainId = await pub.getChainId()
+          const chain = { id: chainId, name: 'minievm', nativeCurrency: { name: 'GAS', symbol: 'GAS', decimals: 18 }, rpcUrls: { default: { http: [rpcUrl] } } }
+          const client = createWalletClient({ account, transport })
+
+          // Send 0.1 GAS — enough for several transactions
+          const hash = await client.sendTransaction({
+            to: address as `0x${string}`,
+            value: parseEther('0.1'),
+            chain,
+            account,
+          })
+          await pub.waitForTransactionReceipt({ hash })
+
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: true, funded: address, hash }))
+        } catch (err: any) {
+          console.error('Fund-gas error:', err)
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: err?.message || 'Transfer failed' }))
+        }
+      })
+
+      // ── /api/faucet — send ERC-20 game tokens to a TBA ──
       server.middlewares.use('/api/faucet', async (req, res) => {
         if (req.method !== 'POST') {
           res.writeHead(405, { 'Content-Type': 'application/json' })
@@ -69,9 +134,16 @@ function faucetPlugin(): Plugin {
 
           const chain = { id: chainId, name: 'minievm', nativeCurrency: { name: 'GAS', symbol: 'GAS', decimals: 18 }, rpcUrls: { default: { http: [rpcUrl] } } }
 
+          // Get nonce once, increment manually to avoid collisions on back-to-back sends
+          let nonce = await pub.getTransactionCount({ address: account.address })
+
           const send = async (token: `0x${string}`, amount: bigint) => {
             const data = encodeFunctionData({ abi, functionName: 'transfer', args: [tba as `0x${string}`, amount] })
-            return client.sendTransaction({ to: token, data, chain, account })
+            const hash = await client.sendTransaction({ to: token, data, chain, account, nonce })
+            nonce++
+            // Wait for receipt to confirm before next tx
+            await pub.waitForTransactionReceipt({ hash })
+            return hash
           }
 
           await send(pxl, parseEther('10000'))

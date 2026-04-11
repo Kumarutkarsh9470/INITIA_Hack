@@ -1,9 +1,8 @@
 {
-  "project_name": "PixelVault",
-  "description": "Full-stack on-chain gaming platform on Initia MiniEVM with ERC-6551 Token Bound Accounts, dual-game mechanics, integrated AMM DEX, P2P marketplace, meta-transaction gas paymaster, and achievement system.",
-  "category": "gaming",
-  "chain": "minievm",
-  "contracts": {
+  "repo_url": "https://github.com/Kumarutkarsh9470/INITIA_Hack",
+  "commit_sha": "FILL_AFTER_FINAL_PUSH",
+  "rollup_chain_id": "trying",
+  "deployed_address": {
     "PXLToken": "0x9317c2bc53aa77A52dEFfd06b62e41bFa6b64cc4",
     "PlayerProfile": "0xf9Ae3a14B2734A48DE48FD665119c05cc82f9997",
     "ERC6551Registry": "0x8e09fB32f113c04D4E67DeD9836F81Ae24b56731",
@@ -17,26 +16,9 @@
     "GasPaymaster": "0xb45a24715BEE2B761167b46aFB69A4A9822bee6e",
     "CommonRelic": "0x4f922647E0aaC41D6B4C451A44D7B0f6409dB99a"
   },
-  "frontend": {
-    "framework": "React + TypeScript + Vite",
-    "url": "http://localhost:5173"
-  },
-  "build": {
-    "install": "npm install && cd frontend && npm install",
-    "deploy": "npx hardhat run scripts/deploy.ts --network minievm",
-    "wire": "npx hardhat run scripts/wire.ts --network minievm",
-    "seed_dex": "npx hardhat run scripts/seed-dex.ts --network minievm",
-    "seed_marketplace": "npx hardhat run scripts/seed-marketplace.ts --network minievm",
-    "frontend_dev": "cd frontend && npm run dev"
-  },
-  "features": [
-    "ERC-6551 Token Bound Accounts for player profiles",
-    "Dual-game mechanics (Dungeon Drops + Harvest Field)",
-    "Constant-product AMM DEX with 0.3% swap fee",
-    "P2P ERC-1155 item marketplace with 2.5% protocol fee",
-    "GasPaymaster meta-transactions (ERC-2771 forwarding)",
-    "On-chain achievement badges + reputation system",
-    "Auto-faucet on profile creation",
-    "Session key support via InterwovenKit"
-  ]
+  "vm": "minievm",
+  "native_feature": "ERC-6551 Token Bound Accounts for player asset ownership, session keys via InterwovenKit, and meta-transaction gas abstraction via GasPaymaster (ERC-2771 forwarding with on-chain DEX swap)",
+  "core_logic_path": "contracts/",
+  "native_feature_frontend_path": "frontend/src/",
+  "demo_video_url": "FILL_BEFORE_SUBMISSION"
 }

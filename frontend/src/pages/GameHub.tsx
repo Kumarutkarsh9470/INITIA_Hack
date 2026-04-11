@@ -97,6 +97,9 @@ export default function GameHub() {
         <p className="text-surface-500 text-sm mt-1">
           Registered games in the PixelVault ecosystem
         </p>
+        <p className="text-xs text-surface-400 mt-1">
+          Each game is a registered client of the shared protocol. Game developers call <Link to="/sdk" className="text-brand-600 hover:underline">the SDK</Link> to read/write on-chain state.
+        </p>
       </div>
 
       <div className="card p-6">
@@ -152,6 +155,24 @@ export default function GameHub() {
                 </div>
               </div>
             ))}
+
+            {/* Coming Soon card */}
+            <div className="flex items-center justify-between bg-surface-50/60 rounded-xl px-5 py-4 border border-dashed border-surface-300">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-surface-100 border border-dashed border-surface-300 flex items-center justify-center text-sm text-surface-400">
+                  +
+                </div>
+                <div>
+                  <p className="font-semibold text-surface-500">Your Game Here</p>
+                  <p className="text-surface-400 text-xs mt-0.5">
+                    Register via GameRegistry to join the ecosystem
+                  </p>
+                </div>
+              </div>
+              <Link to="/sdk" className="text-sm text-brand-600 hover:text-brand-700 font-medium py-2 px-5">
+                View SDK →
+              </Link>
+            </div>
           </div>
         )}
       </div>
