@@ -190,26 +190,6 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 6000,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'vendor-react';
-            }
-            if (id.includes('viem') || id.includes('wagmi') || id.includes('@tanstack')) {
-              return 'vendor-web3';
-            }
-            if (id.includes('@initia') || id.includes('interwovenkit') || id.includes('@cosmjs')) {
-              return 'vendor-initia';
-            }
-            if (id.includes('@walletconnect') || id.includes('@coinbase') || id.includes('@base-org')) {
-              return 'vendor-wallets';
-            }
-          }
-        },
-      },
-    },
   },
   plugins: [
     faucetPlugin(),

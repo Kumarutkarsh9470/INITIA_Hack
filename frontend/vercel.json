@@ -1,0 +1,24 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/evm-rpc", "destination": "/api/evm-rpc" },
+    { "source": "/evm-rpc/:path*", "destination": "/api/evm-rpc" },
+    { "source": "/cosmos-rpc", "destination": "/api/cosmos-rpc" },
+    { "source": "/cosmos-rpc/:path*", "destination": "/api/cosmos-rpc?path=:path*" },
+    { "source": "/cosmos-rest", "destination": "/api/cosmos-rest" },
+    { "source": "/cosmos-rest/:path*", "destination": "/api/cosmos-rest?path=:path*" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+      ]
+    }
+  ]
+}

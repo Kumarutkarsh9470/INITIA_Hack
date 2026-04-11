@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useInterwovenKit } from '@initia/interwovenkit-react'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
-import { useAutoSign } from '../hooks/useAutoSign'
 
 const NAV_ITEMS = [
   { to: '/profile', label: 'Dashboard' },
@@ -15,7 +14,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { openWallet } = useInterwovenKit()
   const { username, tba } = usePlayerProfile()
-  const { isSessionActive, grantSession, revokeSession } = useAutoSign()
 
   const truncate = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`
 
@@ -56,25 +54,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Right side controls */}
           <div className="flex items-center gap-3">
-            {isSessionActive ? (
-              <button
-                onClick={revokeSession}
-                title="Auto-sign is active — transactions sign without popups. Click to manage."
-                className="hidden sm:flex items-center gap-1.5 text-emerald-600 text-xs font-medium hover:text-emerald-700 transition-colors"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Auto-sign on
-              </button>
-            ) : (
-              <button
-                onClick={grantSession}
-                title="Enable auto-sign to skip wallet popups for transactions"
-                className="hidden sm:flex items-center gap-1.5 text-surface-400 text-xs font-medium hover:text-surface-600 transition-colors"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-surface-300" />
-                Auto-sign
-              </button>
-            )}
             <button
               onClick={openWallet}
               className="flex items-center gap-2 bg-surface-100 hover:bg-surface-200 border border-surface-200 px-4 py-2 rounded-xl text-sm transition-all"

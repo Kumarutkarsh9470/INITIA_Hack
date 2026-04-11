@@ -23,12 +23,13 @@ injectStyles(InterwovenKitStyles)
 
 const queryClient = new QueryClient()
 
-// All API calls go through Vite's dev server proxy to avoid CORS.
-// InterwovenKit requires absolute URLs, so prefix with window.location.origin.
+// In dev, Vite proxies /evm-rpc, /cosmos-rpc, /cosmos-rest to localhost.
+// In production (Vercel), env vars point directly to public endpoints,
+// or Vercel serverless functions act as proxies at the same paths.
 const origin = window.location.origin
 const evmRpc = import.meta.env.VITE_JSON_RPC_URL ?? `${origin}/evm-rpc`
-const cosmosRpc = `${origin}/cosmos-rpc`
-const cosmosRest = `${origin}/cosmos-rest`
+const cosmosRpc = import.meta.env.VITE_COSMOS_RPC_URL ?? `${origin}/cosmos-rpc`
+const cosmosRest = import.meta.env.VITE_COSMOS_REST_URL ?? `${origin}/cosmos-rest`
 
 // Define PixelVault MiniEVM as a viem/wagmi chain
 const pixelvaultChain = defineChain({
@@ -64,7 +65,7 @@ const customChain = {
   apis: {
     rpc: [{ address: cosmosRpc }],
     rest: [{ address: cosmosRest }],
-    indexer: [{ address: `${origin}/cosmos-rest` }],
+    indexer: [{ address: cosmosRest }],
     'json-rpc': [{ address: evmRpc }],
   },
   fees: {
