@@ -1,13 +1,15 @@
 import { useState, useCallback } from 'react'
 import { encodeFunctionData } from 'viem'
 import { useInterwovenKit } from '@initia/interwovenkit-react'
-import { ERC6551AccountABI } from '../lib/abis'
+import { ERC6551AccountABI, GasPaymasterABI } from '../lib/abis'
+import { ADDRESSES } from '../lib/addresses'
 import { usePlayerProfile } from './usePlayerProfile'
 
 const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID
 
 interface TBAActions {
   execute: (target: `0x${string}`, value: bigint, calldata: `0x${string}`) => Promise<any>
+  executeViaPaymaster: (gameToken: `0x${string}`, maxGameTokens: bigint, target: `0x${string}`, calldata: `0x${string}`) => Promise<any>
   isPending: boolean
 }
 
@@ -16,9 +18,11 @@ interface TBAActions {
  * Every game action goes through this hook.
  *
  * Usage:
- *   const { execute, isPending } = useTBA()
+ *   const { execute, executeViaPaymaster, isPending } = useTBA()
  *   const calldata = encodeFunctionData({ abi, functionName, args })
  *   await execute(contractAddress, 0n, calldata)
+ *   // Or route through GasPaymaster:
+ *   await executeViaPaymaster(gameTokenAddr, 5n * 10n**18n, contractAddress, calldata)
  */
 export function useTBA(): TBAActions {
   const { initiaAddress, requestTxBlock } = useInterwovenKit()
@@ -62,5 +66,17 @@ export function useTBA(): TBAActions {
     [initiaAddress, tba, requestTxBlock],
   )
 
-  return { execute, isPending }
+  const executeViaPaymaster = useCallback(
+    async (gameToken: `0x${string}`, maxGameTokens: bigint, target: `0x${string}`, calldata: `0x${string}`): Promise<any> => {
+      const paymasterCalldata = encodeFunctionData({
+        abi: GasPaymasterABI,
+        functionName: 'executeWithGameToken',
+        args: [gameToken, maxGameTokens, target, calldata],
+      })
+      return execute(ADDRESSES.GasPaymaster as `0x${string}`, 0n, paymasterCalldata)
+    },
+    [execute],
+  )
+
+  return { execute, executeViaPaymaster, isPending }
 }

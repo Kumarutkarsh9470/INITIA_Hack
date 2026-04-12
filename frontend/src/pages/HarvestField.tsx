@@ -3,9 +3,11 @@ import { formatEther, parseEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
+import { ADDRESSES } from '../lib/addresses'
 import toast from 'react-hot-toast'
 
 const BLOCKS_REQUIRED = 100n
+const GAS_COST_HRV = 5n * 10n ** 18n // 5 HRV per action for gas
 
 function calcReward(amount: bigint, blocksElapsed: bigint): bigint {
   if (amount === 0n || blocksElapsed <= 0n) return 0n
@@ -42,7 +44,7 @@ function ProgressRing({ pct }: { pct: number }) {
 export default function HarvestField() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
-  const { execute, isPending } = useTBA()
+  const { execute, executeViaPaymaster, isPending } = useTBA()
 
   const [hrvBalance, setHrvBalance] = useState(0n)
   const [stakedAmount, setStakedAmount] = useState(0n)
@@ -50,6 +52,10 @@ export default function HarvestField() {
   const [currentBlock, setCurrentBlock] = useState(0n)
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [inputAmount, setInputAmount] = useState('')
+  const [usePaymaster, setUsePaymaster] = useState(() => {
+    try { return localStorage.getItem('pv-gas-harvest') !== 'off' } catch { return true }
+  })
+  const [harvestItemBalance, setHarvestItemBalance] = useState(0n)
 
   const blocksElapsed = stakedAmount > 0n && currentBlock > stakedAtBlock ? currentBlock - stakedAtBlock : 0n
   const progress = Number(blocksElapsed) / Number(BLOCKS_REQUIRED)
@@ -57,18 +63,26 @@ export default function HarvestField() {
   const isStaking = stakedAmount > 0n
   const isReady = isStaking && blocksElapsed >= BLOCKS_REQUIRED
 
+  const togglePaymaster = () => {
+    const next = !usePaymaster
+    setUsePaymaster(next)
+    try { localStorage.setItem('pv-gas-harvest', next ? 'on' : 'off') } catch {}
+  }
+
   const fetchData = useCallback(async () => {
     if (!tba) return
     try {
-      const [balance, stakes, block] = await Promise.all([
+      const [balance, stakes, block, seasonalItem] = await Promise.all([
         publicClient.readContract({ address: contracts.harvestFieldToken.address, abi: contracts.harvestFieldToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.harvestField.address, abi: contracts.harvestField.abi, functionName: 'stakes', args: [tba] }) as Promise<[bigint, bigint]>,
         publicClient.getBlockNumber(),
+        publicClient.readContract({ address: contracts.harvestFieldAssets.address, abi: contracts.harvestFieldAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }) as Promise<bigint>,
       ])
       setHrvBalance(balance)
       setStakedAmount(stakes[0])
       setStakedAtBlock(stakes[1])
       setCurrentBlock(block)
+      setHarvestItemBalance(seasonalItem)
     } catch (err) {
       console.error('HarvestField fetch error:', err)
       toast.error('Failed to load harvest data')
@@ -87,6 +101,37 @@ export default function HarvestField() {
     return () => clearInterval(id)
   }, [isStaking])
 
+  async function ensurePaymasterApproval() {
+    if (!usePaymaster || !tba) return
+    const paymasterAllowance = await publicClient.readContract({
+      address: contracts.harvestFieldToken.address,
+      abi: contracts.harvestFieldToken.abi,
+      functionName: 'allowance',
+      args: [tba, ADDRESSES.GasPaymaster],
+    }) as bigint
+    if (paymasterAllowance < GAS_COST_HRV) {
+      const approvePaymaster = encodeFunctionData({
+        abi: contracts.harvestFieldToken.abi,
+        functionName: 'approve',
+        args: [ADDRESSES.GasPaymaster, GAS_COST_HRV * 100n],
+      })
+      await execute(contracts.harvestFieldToken.address, 0n, approvePaymaster)
+    }
+  }
+
+  async function executeAction(target: `0x${string}`, calldata: `0x${string}`) {
+    if (usePaymaster) {
+      await ensurePaymasterApproval()
+      return executeViaPaymaster(
+        contracts.harvestFieldToken.address,
+        GAS_COST_HRV,
+        target,
+        calldata,
+      )
+    }
+    return execute(target, 0n, calldata)
+  }
+
   async function handleStake() {
     if (!inputAmount || !tba) return
     let parsed: bigint
@@ -97,8 +142,8 @@ export default function HarvestField() {
     try {
       await execute(contracts.harvestFieldToken.address, 0n,
         encodeFunctionData({ abi: contracts.harvestFieldToken.abi, functionName: 'approve', args: [contracts.harvestField.address, parsed] }))
-      await execute(contracts.harvestField.address, 0n,
-        encodeFunctionData({ abi: contracts.harvestField.abi, functionName: 'stake', args: [parsed] }))
+      const stakeCalldata = encodeFunctionData({ abi: contracts.harvestField.abi, functionName: 'stake', args: [parsed] })
+      await executeAction(contracts.harvestField.address, stakeCalldata)
       toast.success('Staked successfully!')
       setInputAmount('')
       await fetchData()
@@ -108,8 +153,8 @@ export default function HarvestField() {
   async function handleHarvest() {
     if (!tba) return
     try {
-      await execute(contracts.harvestField.address, 0n,
-        encodeFunctionData({ abi: contracts.harvestField.abi, functionName: 'harvest', args: [] }))
+      const harvestCalldata = encodeFunctionData({ abi: contracts.harvestField.abi, functionName: 'harvest', args: [] })
+      await executeAction(contracts.harvestField.address, harvestCalldata)
       toast.success('Harvest complete!')
       await fetchData()
     } catch (err: any) { toast.error(err?.message ?? 'Harvest failed') }
@@ -118,8 +163,8 @@ export default function HarvestField() {
   async function handleUnstake() {
     if (!tba) return
     try {
-      await execute(contracts.harvestField.address, 0n,
-        encodeFunctionData({ abi: contracts.harvestField.abi, functionName: 'unstake', args: [] }))
+      const unstakeCalldata = encodeFunctionData({ abi: contracts.harvestField.abi, functionName: 'unstake', args: [] })
+      await executeAction(contracts.harvestField.address, unstakeCalldata)
       toast.success('Unstaked successfully')
       await fetchData()
     } catch (err: any) { toast.error(err?.message ?? 'Unstake failed') }
@@ -133,6 +178,11 @@ export default function HarvestField() {
       </div>
     )
   }
+
+  const rewardMultiplier = harvestItemBalance > 0n ? 1.15 : 1.0
+  const adjustedReward = harvestItemBalance > 0n
+    ? estimatedReward + (estimatedReward * 15n / 100n)
+    : estimatedReward
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -148,12 +198,53 @@ export default function HarvestField() {
         </div>
       </div>
 
+      {/* Gas Paymaster toggle */}
+      <div className="card p-4 animate-fade-in-up">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-surface-700">Pay gas with HRV</p>
+            <p className="text-xs text-surface-400 mt-0.5">
+              {usePaymaster
+                ? 'GasPaymaster active — 5 HRV covers gas via ERC-2771 meta-tx'
+                : 'Using native GAS token for transaction fees'}
+            </p>
+          </div>
+          <button
+            onClick={togglePaymaster}
+            className={`relative w-11 h-6 rounded-full transition-colors ${usePaymaster ? 'bg-brand-500' : 'bg-surface-300'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${usePaymaster ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Item Utility - Seasonal Harvest Item */}
+      {harvestItemBalance > 0n && (
+        <div className="card p-5 space-y-3 animate-fade-in-up border-emerald-200 bg-emerald-50/30">
+          <h2 className="section-title">Active Bonus</h2>
+          <div className="flex items-center justify-between rounded-xl p-3 bg-white border border-emerald-200">
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg">🌾</span>
+              <div>
+                <p className="text-sm font-medium text-emerald-700">Seasonal Harvest Bundle</p>
+                <p className="text-xs text-emerald-600">+15% staking reward multiplier</p>
+              </div>
+            </div>
+            <span className="text-xs font-mono text-emerald-500">×{harvestItemBalance.toString()}</span>
+          </div>
+          <p className="text-[10px] text-surface-300 italic">In production, multiplier enforced on-chain via modifier checks.</p>
+        </div>
+      )}
+
       {/* Not staking */}
       {!isStaking && (
         <div className="card p-6 space-y-5 animate-fade-in-up">
           <div>
             <h2 className="section-title">Start Staking</h2>
-            <p className="text-surface-500 text-sm mt-0.5">Lock HRV for 100 blocks and earn proportional rewards.</p>
+            <p className="text-surface-500 text-sm mt-0.5">
+              Lock HRV for 100 blocks and earn proportional rewards.
+              {usePaymaster && <span className="text-brand-500 ml-1">(via GasPaymaster)</span>}
+            </p>
           </div>
           <div>
             <label className="text-xs font-medium text-surface-500 uppercase tracking-wider block mb-1.5">Amount</label>
@@ -168,13 +259,18 @@ export default function HarvestField() {
             </div>
           </div>
           {inputAmount && parseFloat(inputAmount) > 0 && (
-            <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-sm">
+            <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-sm space-y-1">
               <p className="text-surface-500">
-                Estimated reward after 100 blocks:{' '}
+                Base reward after 100 blocks:{' '}
                 <span className="text-surface-900 font-semibold">
                   {fmt(calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 100n))} HRV
                 </span>
               </p>
+              {harvestItemBalance > 0n && (
+                <p className="text-emerald-600 text-xs">
+                  🌾 +15% bonus → {fmt(calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 100n) + calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 100n) * 15n / 100n)} HRV
+                </p>
+              )}
             </div>
           )}
           <button onClick={handleStake} disabled={isPending || !inputAmount || parseFloat(inputAmount) <= 0}
@@ -196,10 +292,15 @@ export default function HarvestField() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <StatBox label="Staked" value={`${fmt(stakedAmount)} HRV`} />
-            <StatBox label="Est. Reward" value={`${fmt(estimatedReward)} HRV`} highlight />
+            <StatBox label="Est. Reward" value={`${fmt(adjustedReward)} HRV`} highlight />
             <StatBox label="Staked at block" value={stakedAtBlock.toString()} mono />
             <StatBox label="Current block" value={currentBlock.toString()} mono />
           </div>
+          {harvestItemBalance > 0n && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-xs text-emerald-700 text-center">
+              🌾 Seasonal Bundle active — earning {(rewardMultiplier * 100 - 100).toFixed(0)}% bonus rewards
+            </div>
+          )}
           <div>
             <div className="flex justify-between text-xs text-surface-500 mb-1">
               <span>Progress</span>
@@ -235,8 +336,11 @@ export default function HarvestField() {
           </div>
           <div className="bg-white border border-emerald-200 rounded-xl p-5 text-center">
             <p className="text-surface-400 text-sm mb-1">You will receive</p>
-            <p className="text-4xl font-bold text-emerald-600">{fmt(estimatedReward)}</p>
+            <p className="text-4xl font-bold text-emerald-600">{fmt(adjustedReward)}</p>
             <p className="text-emerald-600/60 text-sm mt-0.5">HRV tokens</p>
+            {harvestItemBalance > 0n && (
+              <p className="text-emerald-500 text-xs mt-1">🌾 Includes +15% seasonal bonus</p>
+            )}
             <p className="text-surface-400 text-xs mt-2">
               Staked {fmt(stakedAmount)} HRV · {Number(blocksElapsed)} blocks
             </p>
@@ -260,6 +364,9 @@ export default function HarvestField() {
         <p>1. Approve & stake any amount of HRV.</p>
         <p>2. Wait for 100 blocks (~8 min on Initia).</p>
         <p>3. Harvest to receive staked HRV plus rewards.</p>
+        {harvestItemBalance > 0n && (
+          <p className="text-emerald-600">🌾 Your Seasonal Harvest Bundle grants +15% bonus rewards!</p>
+        )}
       </div>
     </div>
   )

@@ -24,10 +24,12 @@ type GasRecord = { txHash: string; targetName: string; tokenName: string; tokens
 export default function GasSettings() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
-  const [preferredToken, setPreferredToken] = useState<'DNGN' | 'HRV'>('DNGN')
   const [isLoading, setIsLoading] = useState(true)
   const [gasHistory, setGasHistory] = useState<GasRecord[]>([])
   const [rates, setRates] = useState<{ dngn: bigint; hrv: bigint }>({ dngn: 0n, hrv: 0n })
+
+  const dungeonPaymaster = (() => { try { return localStorage.getItem('pv-gas-dungeon') !== 'off' } catch { return true } })()
+  const harvestPaymaster = (() => { try { return localStorage.getItem('pv-gas-harvest') !== 'off' } catch { return true } })()
 
   useEffect(() => {
     if (!tba) return
@@ -64,23 +66,44 @@ export default function GasSettings() {
     <div className="space-y-6 max-w-lg">
       <div>
         <h1 className="page-title">Gas Settings</h1>
-        <p className="text-surface-500 text-sm mt-0.5">Pay gas with game tokens instead of PXL</p>
+        <p className="text-surface-500 text-sm mt-0.5">Pay gas with game tokens instead of native GAS via ERC-2771 meta-transactions</p>
       </div>
 
-      {/* Preferred Token */}
+      {/* Active Status */}
       <div className="card p-5 space-y-3">
-        <h2 className="section-title">Preferred Gas Token</h2>
-        <p className="text-sm text-surface-500">Choose which token the GasPaymaster uses for your transactions.</p>
-        <div className="flex gap-2">
-          {(['DNGN', 'HRV'] as const).map(token => (
-            <button key={token} onClick={() => setPreferredToken(token)}
-              className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors
-                ${preferredToken === token
-                  ? 'bg-brand-500 text-white'
-                  : 'bg-surface-100 text-surface-500 hover:bg-surface-200'}`}>
-              {token}
-            </button>
-          ))}
+        <h2 className="section-title">GasPaymaster Status</h2>
+        <p className="text-xs text-surface-400">Each game page has its own toggle. Status shown below.</p>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between bg-surface-50 rounded-xl p-3 border border-surface-100">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${dungeonPaymaster ? 'bg-emerald-500' : 'bg-surface-300'}`} />
+              <span className="text-sm font-medium text-surface-700">Dungeon Drops</span>
+            </div>
+            <span className={`text-xs font-medium ${dungeonPaymaster ? 'text-emerald-600' : 'text-surface-400'}`}>
+              {dungeonPaymaster ? 'Paying gas in DNGN' : 'Native gas'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between bg-surface-50 rounded-xl p-3 border border-surface-100">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${harvestPaymaster ? 'bg-emerald-500' : 'bg-surface-300'}`} />
+              <span className="text-sm font-medium text-surface-700">Harvest Field</span>
+            </div>
+            <span className={`text-xs font-medium ${harvestPaymaster ? 'text-emerald-600' : 'text-surface-400'}`}>
+              {harvestPaymaster ? 'Paying gas in HRV' : 'Native gas'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* How it works */}
+      <div className="card p-5 space-y-2">
+        <h2 className="section-title">How GasPaymaster Works</h2>
+        <div className="text-xs text-surface-500 space-y-1.5">
+          <p>1. Your TBA approves GasPaymaster to spend game tokens (one-time).</p>
+          <p>2. Game calls are routed through <code className="text-brand-600 bg-surface-100 px-1 rounded">GasPaymaster.executeWithGameToken()</code>.</p>
+          <p>3. GasPaymaster takes 5 tokens, swaps them to PXL via the DEX.</p>
+          <p>4. The original call is forwarded using ERC-2771 meta-transaction pattern.</p>
+          <p>5. Unused PXL is refunded to your TBA.</p>
         </div>
       </div>
 
@@ -109,7 +132,7 @@ export default function GasSettings() {
         ) : gasHistory.length === 0 ? (
           <div className="text-center py-10">
             <p className="text-surface-400 text-sm">No gas payments recorded yet.</p>
-            <p className="text-surface-300 text-xs mt-1">They will appear after interacting with PixelVault contracts.</p>
+            <p className="text-surface-300 text-xs mt-1">Play a game with GasPaymaster enabled to see entries here.</p>
           </div>
         ) : (
           <div className="space-y-2">

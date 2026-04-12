@@ -12,6 +12,7 @@ import GameTokenABI from './GameToken.json'
 import GameAssetCollectionABI from './GameAssetCollection.json'
 import ERC6551AccountABI from './ERC6551Account.json'
 import ERC6551RegistryABI from './ERC6551Registry.json'
+import BarterMarketABI from './BarterMarket.json'
 
 export {
   PlayerProfileABI,
@@ -28,4 +29,5 @@ export {
   GameAssetCollectionABI,
   ERC6551AccountABI,
   ERC6551RegistryABI,
+  BarterMarketABI,
 }

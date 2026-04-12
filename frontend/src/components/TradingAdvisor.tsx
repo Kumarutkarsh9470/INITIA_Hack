@@ -114,6 +114,10 @@ export default function TradingAdvisor() {
           DungeonDrops: `${dngnRatingNum.toFixed(1)} stars`,
           HarvestField: `${hrvRatingNum.toFixed(1)} stars`,
         },
+        dexPrices: {
+          dngnPricePxl: dngnPricePxl.toFixed(6),
+          hrvPricePxl: hrvPricePxl.toFixed(6),
+        },
       }
 
       const res = await fetch('/api/advisor', {

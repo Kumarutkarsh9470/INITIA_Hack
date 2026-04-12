@@ -16,6 +16,7 @@ import {
   GameAssetCollectionABI,
   ERC6551AccountABI,
   ERC6551RegistryABI,
+  BarterMarketABI,
 } from '../lib/abis'
 
 const JSON_RPC_URL = import.meta.env.VITE_JSON_RPC_URL ?? `${window.location.origin}/evm-rpc`
@@ -47,6 +48,7 @@ interface Contracts {
   harvestFieldAssets: { address: `0x${string}`; abi: typeof GameAssetCollectionABI }
   erc6551Account: { address: `0x${string}`; abi: typeof ERC6551AccountABI }
   erc6551Registry: { address: `0x${string}`; abi: typeof ERC6551RegistryABI }
+  barterMarket: { address: `0x${string}`; abi: typeof BarterMarketABI }
 }
 
 export function useContracts(): Contracts {
@@ -69,6 +71,7 @@ export function useContracts(): Contracts {
       harvestFieldAssets: { address: ADDRESSES.HarvestFieldAssets, abi: GameAssetCollectionABI },
       erc6551Account: { address: ADDRESSES.ERC6551Account, abi: ERC6551AccountABI },
       erc6551Registry: { address: ADDRESSES.ERC6551Registry, abi: ERC6551RegistryABI },
+      barterMarket: { address: ADDRESSES.BarterMarket, abi: BarterMarketABI },
     }),
     [],
   )

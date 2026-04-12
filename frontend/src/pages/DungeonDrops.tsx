@@ -7,6 +7,8 @@ import { ADDRESSES } from '../lib/addresses'
 import { DUNGEON_ENTRY_FEE } from '../lib/constants'
 import toast from 'react-hot-toast'
 
+const GAS_COST_DNGN = 5n * 10n ** 18n // 5 DNGN per run for gas
+
 const DUNGEON_ITEM_NAMES: Record<number, string> = {
   1: 'Common Sword',
   2: 'Rare Shield',
@@ -25,10 +27,16 @@ const DROP_RATES = [
   { itemId: 3, name: 'Legendary Crown', pct: 10, color: 'bg-amber-500' },
 ]
 
+const ITEM_BONUSES: Record<number, { icon: string; label: string; bonus: string }> = {
+  1: { icon: '⚔️', label: 'Common Sword', bonus: '+5% crit chance' },
+  2: { icon: '🛡️', label: 'Rare Shield', bonus: '+10% defense, -1 DNGN fee' },
+  3: { icon: '👑', label: 'Legendary Crown', bonus: '+25% loot quality, -3 DNGN fee' },
+}
+
 export default function DungeonDrops() {
   const { tba, refetch } = usePlayerProfile()
   const contracts = useContracts()
-  const { execute, isPending } = useTBA()
+  const { execute, executeViaPaymaster, isPending } = useTBA()
 
   const [dngnBalance, setDngnBalance] = useState(0n)
   const [totalRuns, setTotalRuns] = useState(0n)
@@ -36,20 +44,28 @@ export default function DungeonDrops() {
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [lootItemId, setLootItemId] = useState<number | null>(null)
   const [showLoot, setShowLoot] = useState(false)
+  const [usePaymaster, setUsePaymaster] = useState(() => {
+    try { return localStorage.getItem('pv-gas-dungeon') !== 'off' } catch { return true }
+  })
+  const [itemBalances, setItemBalances] = useState<Record<number, bigint>>({ 1: 0n, 2: 0n, 3: 0n })
 
   useEffect(() => {
     if (!tba) return
     const fetchAll = async () => {
       setIsLoadingData(true)
       try {
-        const [dngn, runs, nonce] = await Promise.all([
+        const [dngn, runs, nonce, item1, item2, item3] = await Promise.all([
           publicClient.readContract({ address: contracts.dungeonDropsToken.address, abi: contracts.dungeonDropsToken.abi, functionName: 'balanceOf', args: [tba] }),
           publicClient.readContract({ address: contracts.dungeonDrops.address, abi: contracts.dungeonDrops.abi, functionName: 'totalRuns', args: [] }),
           publicClient.readContract({ address: contracts.dungeonDrops.address, abi: contracts.dungeonDrops.abi, functionName: 'playerNonce', args: [tba] }),
+          publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }),
+          publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }),
+          publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }),
         ])
         setDngnBalance(dngn as bigint)
         setTotalRuns(runs as bigint)
         setPlayerNonce(nonce as bigint)
+        setItemBalances({ 1: item1 as bigint, 2: item2 as bigint, 3: item3 as bigint })
       } catch (error) {
         console.error('Error fetching dungeon data:', error)
         toast.error('Failed to load dungeon data')
@@ -60,12 +76,18 @@ export default function DungeonDrops() {
     fetchAll()
   }, [tba, contracts])
 
+  const togglePaymaster = () => {
+    const next = !usePaymaster
+    setUsePaymaster(next)
+    try { localStorage.setItem('pv-gas-dungeon', next ? 'on' : 'off') } catch {}
+  }
+
   const handleEnterDungeon = async () => {
     if (!tba) return
     setShowLoot(false)
     setLootItemId(null)
     try {
-      // Step 1: Check allowance and approve DungeonDrops to pull DNGN from TBA
+      // Step 1: Check allowance and approve DungeonDrops to pull DNGN from TBA (entry fee)
       const allowance = await publicClient.readContract({
         address: contracts.dungeonDropsToken.address,
         abi: contracts.dungeonDropsToken.abi,
@@ -74,7 +96,6 @@ export default function DungeonDrops() {
       }) as bigint
 
       if (allowance < DUNGEON_ENTRY_FEE) {
-        // Approve 100 runs worth (1000 DNGN) so user doesn't need to re-approve every time
         const approveData = encodeFunctionData({
           abi: contracts.dungeonDropsToken.abi,
           functionName: 'approve',
@@ -83,9 +104,38 @@ export default function DungeonDrops() {
         await execute(contracts.dungeonDropsToken.address, 0n, approveData)
       }
 
-      // Step 2: Enter the dungeon
       const calldata = encodeFunctionData({ abi: contracts.dungeonDrops.abi, functionName: 'enterDungeon', args: [] })
-      const receipt = await execute(ADDRESSES.DungeonDrops, 0n, calldata)
+
+      let receipt: any
+      if (usePaymaster) {
+        // Step 2a: Approve GasPaymaster to pull DNGN for gas
+        const paymasterAllowance = await publicClient.readContract({
+          address: contracts.dungeonDropsToken.address,
+          abi: contracts.dungeonDropsToken.abi,
+          functionName: 'allowance',
+          args: [tba, ADDRESSES.GasPaymaster],
+        }) as bigint
+
+        if (paymasterAllowance < GAS_COST_DNGN) {
+          const approvePaymaster = encodeFunctionData({
+            abi: contracts.dungeonDropsToken.abi,
+            functionName: 'approve',
+            args: [ADDRESSES.GasPaymaster, GAS_COST_DNGN * 100n],
+          })
+          await execute(contracts.dungeonDropsToken.address, 0n, approvePaymaster)
+        }
+
+        // Step 3a: Enter dungeon via GasPaymaster
+        receipt = await executeViaPaymaster(
+          contracts.dungeonDropsToken.address,
+          GAS_COST_DNGN,
+          ADDRESSES.DungeonDrops as `0x${string}`,
+          calldata,
+        )
+      } else {
+        // Step 2b: Enter dungeon directly
+        receipt = await execute(ADDRESSES.DungeonDrops, 0n, calldata)
+      }
 
       let droppedItemId: number | null = null
       if (receipt?.logs) {
@@ -109,14 +159,18 @@ export default function DungeonDrops() {
       }
 
       refetch()
-      const [newDngn, newRuns, newNonce] = await Promise.all([
+      const [newDngn, newRuns, newNonce, newItem1, newItem2, newItem3] = await Promise.all([
         publicClient.readContract({ address: contracts.dungeonDropsToken.address, abi: contracts.dungeonDropsToken.abi, functionName: 'balanceOf', args: [tba] }),
         publicClient.readContract({ address: contracts.dungeonDrops.address, abi: contracts.dungeonDrops.abi, functionName: 'totalRuns', args: [] }),
         publicClient.readContract({ address: contracts.dungeonDrops.address, abi: contracts.dungeonDrops.abi, functionName: 'playerNonce', args: [tba] }),
+        publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }),
+        publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }),
+        publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }),
       ])
       setDngnBalance(newDngn as bigint)
       setTotalRuns(newRuns as bigint)
       setPlayerNonce(newNonce as bigint)
+      setItemBalances({ 1: newItem1 as bigint, 2: newItem2 as bigint, 3: newItem3 as bigint })
     } catch (error) {
       console.error('Dungeon run failed:', error)
       toast.error('Dungeon run failed')
@@ -125,6 +179,8 @@ export default function DungeonDrops() {
 
   const lootRarity = lootItemId ? ITEM_RARITY[lootItemId] : null
   const lootName = lootItemId ? DUNGEON_ITEM_NAMES[lootItemId] : null
+  const heldItems = Object.entries(itemBalances).filter(([, bal]) => bal > 0n)
+  const totalCost = usePaymaster ? DUNGEON_ENTRY_FEE + GAS_COST_DNGN : DUNGEON_ENTRY_FEE
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -146,7 +202,7 @@ export default function DungeonDrops() {
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <p className="stat-label">Entry Fee</p>
           <p className="text-xl font-bold text-surface-900 mt-1">10</p>
-          <p className="text-xs text-surface-400">DNGN</p>
+          <p className="text-xs text-surface-400">DNGN{usePaymaster ? ' + 5 gas' : ''}</p>
         </div>
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
           <p className="stat-label">Your Runs</p>
@@ -157,16 +213,67 @@ export default function DungeonDrops() {
         </div>
       </div>
 
+      {/* Gas Paymaster toggle */}
+      <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-surface-700">Pay gas with DNGN</p>
+            <p className="text-xs text-surface-400 mt-0.5">
+              {usePaymaster
+                ? 'GasPaymaster active — 5 DNGN covers gas via ERC-2771 meta-tx'
+                : 'Using native GAS token for transaction fees'}
+            </p>
+          </div>
+          <button
+            onClick={togglePaymaster}
+            className={`relative w-11 h-6 rounded-full transition-colors ${usePaymaster ? 'bg-brand-500' : 'bg-surface-300'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${usePaymaster ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Item Utility / Inventory */}
+      {heldItems.length > 0 && (
+        <div className="card p-5 space-y-3 animate-fade-in-up" style={{ animationDelay: '240ms' }}>
+          <h2 className="section-title">Your Equipment</h2>
+          <p className="text-xs text-surface-400">Items in your inventory grant passive bonuses</p>
+          <div className="space-y-2">
+            {heldItems.map(([idStr, bal]) => {
+              const id = Number(idStr)
+              const info = ITEM_BONUSES[id]
+              if (!info) return null
+              return (
+                <div key={id} className={`flex items-center justify-between rounded-xl p-3 border ${ITEM_RARITY[id]?.bg ?? 'bg-surface-50 border-surface-200'}`}>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">{info.icon}</span>
+                    <div>
+                      <p className={`text-sm font-medium ${ITEM_RARITY[id]?.color ?? 'text-surface-700'}`}>{info.label}</p>
+                      <p className="text-xs text-surface-500">{info.bonus}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-surface-400">×{bal.toString()}</span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-[10px] text-surface-300 italic">In production, bonuses are enforced on-chain via modifier checks.</p>
+        </div>
+      )}
+
       {/* Enter Dungeon */}
       <div className="card p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="section-title">Enter the Dungeon</h2>
-            <p className="text-surface-500 text-sm mt-0.5">Drops one random item per run</p>
+            <p className="text-surface-500 text-sm mt-0.5">
+              Drops one random item per run
+              {usePaymaster && <span className="text-brand-500 ml-1">(via GasPaymaster)</span>}
+            </p>
           </div>
           <button
             onClick={handleEnterDungeon}
-            disabled={isPending || dngnBalance < DUNGEON_ENTRY_FEE}
+            disabled={isPending || dngnBalance < totalCost}
             className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending ? (
