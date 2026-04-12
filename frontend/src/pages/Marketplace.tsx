@@ -1,13 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { formatEther, parseEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
-import { DUNGEON_ITEMS, HARVEST_ITEMS, GAME_IDS } from '../lib/constants'
+import { DUNGEON_ITEMS, HARVEST_ITEMS, GAME_IDS, DUNGEON_EXPECTED_COST, DUNGEON_DROP_RATES } from '../lib/constants'
 import toast from 'react-hot-toast'
 
 type Listing = { id: bigint; seller: string; collection: string; itemId: bigint; amount: bigint; priceInPXL: bigint; gameId: string; active: boolean }
 type InventoryItem = { collection: `0x${string}`; gameName: string; gameId: `0x${string}`; itemId: number; itemName: string; balance: bigint }
+type GameFilter = 'all' | 'dungeon' | 'harvest' | 'cross-game'
+
+function ammEstimate(amtIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
+  if (reserveIn === 0n || reserveOut === 0n || amtIn === 0n) return 0n
+  const amtInWithFee = amtIn * 997n
+  return (amtInWithFee * reserveOut) / (reserveIn * 1000n + amtInWithFee)
+}
 
 export default function Marketplace() {
   const { tba } = usePlayerProfile()
@@ -15,17 +22,31 @@ export default function Marketplace() {
   const { execute, isPending } = useTBA()
 
   const [activeTab, setActiveTab] = useState<'browse' | 'list'>('browse')
+  const [gameFilter, setGameFilter] = useState<GameFilter>('all')
   const [isLoading, setIsLoading] = useState(true)
   const [listings, setListings] = useState<Listing[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [listAmount, setListAmount] = useState('1')
   const [listPricePXL, setListPricePXL] = useState('')
+  const [pools, setPools] = useState<{ DNGN: { reservePXL: bigint; reserveGame: bigint }; HRV: { reservePXL: bigint; reserveGame: bigint } }>({
+    DNGN: { reservePXL: 0n, reserveGame: 0n },
+    HRV: { reservePXL: 0n, reserveGame: 0n },
+  })
 
   const fetchData = async () => {
     if (!tba) return
     setIsLoading(true)
     try {
+      // Fetch pool reserves for floor price computation
+      const fetchPool = async (gameId: `0x${string}`) => {
+        const poolData = await publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [gameId] })
+        const arr = poolData as unknown as [string, bigint, bigint, string, boolean, bigint]
+        return { reservePXL: arr[1], reserveGame: arr[2] }
+      }
+      const [dngnPool, hrvPool] = await Promise.all([fetchPool(GAME_IDS.DUNGEON), fetchPool(GAME_IDS.HARVEST)])
+      setPools({ DNGN: dngnPool, HRV: hrvPool })
+
       const nextIdRaw = await publicClient.readContract({ address: contracts.marketplace.address, abi: contracts.marketplace.abi, functionName: 'nextListingId' })
       const nextId = Number(nextIdRaw)
       const fetchedListings: Listing[] = []
@@ -52,6 +73,48 @@ export default function Marketplace() {
   }
 
   useEffect(() => { fetchData() }, [tba, contracts])
+
+  // Floor price: convert expected DNGN cost to PXL via AMM
+  const getFloorPricePXL = useCallback((collection: string, itemId: bigint): bigint | null => {
+    if (collection === contracts.dungeonDropsAssets.address) {
+      const costInDNGN = DUNGEON_EXPECTED_COST[Number(itemId)]
+      if (!costInDNGN) return null
+      const { reservePXL, reserveGame } = pools.DNGN
+      if (reservePXL === 0n || reserveGame === 0n) return null
+      // How much PXL would you get for costInDNGN DNGN? That's the floor.
+      return ammEstimate(costInDNGN, reserveGame, reservePXL)
+    }
+    if (collection === contracts.harvestFieldAssets.address) {
+      // Harvest items are byproducts of staking — minimal direct cost
+      // Floor ≈ opportunity cost, approximate as 1 HRV worth of PXL
+      const { reservePXL, reserveGame } = pools.HRV
+      if (reservePXL === 0n || reserveGame === 0n) return null
+      return ammEstimate(1000000000000000000n, reserveGame, reservePXL) // 1 HRV → PXL
+    }
+    return null
+  }, [contracts, pools])
+
+  const getDropRate = (collection: string, itemId: bigint): number | null => {
+    if (collection === contracts.dungeonDropsAssets.address) {
+      return DUNGEON_DROP_RATES[Number(itemId)] ?? null
+    }
+    return null
+  }
+
+  const getPremiumPct = (askPXL: bigint, floorPXL: bigint | null): number | null => {
+    if (!floorPXL || floorPXL === 0n) return null
+    return Number(((askPXL - floorPXL) * 10000n) / floorPXL) / 100
+  }
+
+  // Cross-game filter logic
+  const filteredListings = useMemo(() => {
+    if (gameFilter === 'all') return listings
+    if (gameFilter === 'dungeon') return listings.filter(l => l.gameId === GAME_IDS.DUNGEON)
+    if (gameFilter === 'harvest') return listings.filter(l => l.gameId === GAME_IDS.HARVEST)
+    // Cross-game: items listed from a different game's collection
+    // (Any listing is inherently cross-game tradeable since PXL is the intermediary)
+    return listings
+  }, [listings, gameFilter])
 
   const handleBuy = async (listing: Listing, buyAmount?: bigint) => {
     if (!tba) return toast.error('Wallet not connected')
@@ -131,26 +194,89 @@ export default function Marketplace() {
       {/* BROWSE TAB */}
       {activeTab === 'browse' && (
         <div>
+          {/* Game Filter */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {([
+              { key: 'all', label: 'All Games' },
+              { key: 'dungeon', label: 'Dungeon Drops' },
+              { key: 'harvest', label: 'Harvest Field' },
+            ] as { key: GameFilter; label: string }[]).map(({ key, label }) => (
+              <button key={key} onClick={() => setGameFilter(key)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
+                  ${gameFilter === key
+                    ? 'bg-brand-50 border-brand-200 text-brand-700'
+                    : 'bg-surface-50 border-surface-200 text-surface-500 hover:text-surface-700'}`}>
+                {label}
+                {key !== 'all' && (
+                  <span className="ml-1.5 text-xs opacity-60">
+                    ({listings.filter(l => key === 'dungeon' ? l.gameId === GAME_IDS.DUNGEON : l.gameId === GAME_IDS.HARVEST).length})
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Floor Price Legend */}
+          {(pools.DNGN.reservePXL > 0n || pools.HRV.reservePXL > 0n) && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3 mb-4 text-sm">
+              <p className="font-semibold text-amber-800 text-xs uppercase tracking-wider mb-1">AMM-Informed Floor Prices</p>
+              <p className="text-amber-700 text-xs">
+                Floor prices are computed from each item's production cost (entry fee / drop rate) converted to PXL via the DEX.
+                Listings below floor are potential bargains.
+              </p>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
               {[1, 2, 3].map(i => <div key={i} className="h-40 bg-surface-100 rounded-xl" />)}
             </div>
-          ) : listings.length === 0 ? (
+          ) : filteredListings.length === 0 ? (
             <div className="text-center py-16 card">
-              <p className="text-surface-400 text-sm">No active listings right now.</p>
+              <p className="text-surface-400 text-sm">No active listings{gameFilter !== 'all' ? ' for this game' : ''}.</p>
               <p className="text-surface-300 text-xs mt-1">Play games to earn items, then list them here.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {listings.map((listing, i) => (
-                <div key={listing.id.toString()} className="card-hover p-5 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
+              {filteredListings.map((listing, i) => {
+                const floorPXL = getFloorPricePXL(listing.collection, listing.itemId)
+                const premium = getPremiumPct(listing.priceInPXL, floorPXL)
+                const dropRate = getDropRate(listing.collection, listing.itemId)
+                const isBelowFloor = premium !== null && premium < 0
+                const isHarvest = listing.gameId === GAME_IDS.HARVEST
+                return (
+                <div key={listing.id.toString()} className={`card-hover p-5 flex flex-col justify-between animate-fade-in-up ${isBelowFloor ? 'ring-2 ring-emerald-300' : ''}`} style={{ animationDelay: `${i * 80}ms` }}>
                   <div>
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-bold text-surface-900">{getItemName(listing.collection, listing.itemId)}</h3>
                       <span className="badge">Qty: {listing.amount.toString()}</span>
                     </div>
-                    <p className="text-sm text-surface-500">{getGameName(listing.gameId)}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-surface-500">{getGameName(listing.gameId)}</p>
+                      {dropRate !== null && (
+                        <span className="text-xs bg-surface-100 text-surface-500 px-1.5 py-0.5 rounded">{dropRate}% drop</span>
+                      )}
+                    </div>
                     <p className="text-xs text-surface-400 mt-0.5">Seller: {truncate(listing.seller)}</p>
+
+                    {/* Floor Price & Premium */}
+                    {floorPXL !== null && floorPXL > 0n && (
+                      <div className="mt-2 bg-surface-50 rounded-lg p-2 border border-surface-100">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-surface-400">{isHarvest ? 'Ref. value' : 'Floor price'}</span>
+                          <span className="font-mono text-surface-500">{parseFloat(formatEther(floorPXL)).toFixed(2)} PXL</span>
+                        </div>
+                        {premium !== null && (
+                          <div className="flex justify-between items-center text-xs mt-0.5">
+                            <span className="text-surface-400">vs. asking</span>
+                            <span className={`font-semibold ${premium < 0 ? 'text-emerald-600' : premium > 50 ? 'text-red-500' : 'text-amber-600'}`}>
+                              {premium > 0 ? '+' : ''}{premium.toFixed(1)}%
+                              {premium < 0 && ' (below floor!)'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-100">
                     <div>
@@ -163,11 +289,11 @@ export default function Marketplace() {
                     <button onClick={() => handleBuy(listing)}
                       disabled={isPending || listing.seller.toLowerCase() === tba?.toLowerCase()}
                       className="btn-primary px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                      {listing.seller.toLowerCase() === tba?.toLowerCase() ? 'Your Listing' : 'Buy Now'}
+                      {listing.seller.toLowerCase() === tba?.toLowerCase() ? 'Your Listing' : isBelowFloor ? 'Buy (Deal!)' : 'Buy Now'}
                     </button>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>
@@ -218,6 +344,28 @@ export default function Marketplace() {
                   <p className="stat-label">Selected Item</p>
                   <p className="font-semibold text-surface-900 text-lg">{selectedItem.itemName}</p>
                 </div>
+
+                {/* Floor price hint for seller */}
+                {(() => {
+                  const floor = getFloorPricePXL(selectedItem.collection, BigInt(selectedItem.itemId))
+                  const dropRate = getDropRate(selectedItem.collection, BigInt(selectedItem.itemId))
+                  if (!floor || floor === 0n) return null
+                  const floorStr = parseFloat(formatEther(floor)).toFixed(2)
+                  return (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+                      <p className="font-semibold text-amber-800 mb-0.5">Pricing Guide</p>
+                      <p>Production floor: <span className="font-mono font-semibold">{floorStr} PXL</span>
+                        {dropRate && <span className="ml-1">({dropRate}% drop rate)</span>}
+                      </p>
+                      <p className="mt-0.5">Listing below this price means buyers get a deal!</p>
+                      <button type="button" onClick={() => setListPricePXL(floorStr)}
+                        className="mt-1.5 text-amber-800 underline hover:text-amber-900 font-medium">
+                        Use floor price
+                      </button>
+                    </div>
+                  )
+                })()}
+
                 <div>
                   <label className="text-xs font-medium text-surface-500 uppercase tracking-wider block mb-1">Quantity</label>
                   <input type="number" min="1" max={selectedItem.balance.toString()} value={listAmount}

@@ -4,12 +4,12 @@ import { useInterwovenKit } from '@initia/interwovenkit-react'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
-import { GAME_IDS } from '../lib/constants'
+import { GAME_IDS, DUNGEON_ITEMS, DUNGEON_EXPECTED_COST, DUNGEON_DROP_RATES } from '../lib/constants'
 import toast from 'react-hot-toast'
 
 type GameToken = 'DNGN' | 'HRV'
 type SwapDirection = 'pxlToGame' | 'gameToPxl'
-type Tab = 'swap' | 'liquidity'
+type Tab = 'swap' | 'liquidity' | 'economics'
 
 interface PoolInfo { reservePXL: bigint; reserveGame: bigint; price: bigint }
 
@@ -179,11 +179,11 @@ export default function DEX() {
 
       {/* Tabs */}
       <div className="flex bg-surface-100 rounded-xl p-1 gap-1">
-        {(['swap', 'liquidity'] as Tab[]).map(t => (
+        {(['swap', 'liquidity', 'economics'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium capitalize transition-colors
               ${tab === t ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700'}`}>
-            {t === 'swap' ? 'Swap' : 'Liquidity'}
+            {t === 'swap' ? 'Swap' : t === 'liquidity' ? 'Liquidity' : 'Economics'}
           </button>
         ))}
       </div>
@@ -308,6 +308,99 @@ export default function DEX() {
               className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-3 rounded-xl transition-colors disabled:opacity-50">
               {isPending ? 'Processing…' : 'Remove Liquidity'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ECONOMICS TAB */}
+      {tab === 'economics' && (
+        <div className="space-y-4">
+          {/* How it works */}
+          <div className="card p-5 space-y-3">
+            <h3 className="section-title text-sm">AMM-Informed Item Pricing</h3>
+            <p className="text-xs text-surface-500">
+              PixelVault uniquely connects game economies through transparent on-chain price discovery.
+              Every in-game item has a computable floor price based on its production cost and DEX exchange rates.
+            </p>
+            <div className="bg-surface-50 rounded-xl p-3 border border-surface-100 text-xs text-surface-600 font-mono">
+              floor_pxl = (entry_fee / drop_rate) × DNGN→PXL rate
+            </div>
+          </div>
+
+          {/* Dungeon item floor prices */}
+          <div className="card p-5 space-y-3">
+            <h3 className="section-title text-sm">Dungeon Drops — Item Floor Prices</h3>
+            <div className="space-y-2">
+              {([1, 2, 3] as const).map(itemId => {
+                const costDNGN = DUNGEON_EXPECTED_COST[itemId]
+                const dropRate = DUNGEON_DROP_RATES[itemId]
+                const { reservePXL, reserveGame } = pools.DNGN
+                const floorPXL = (reservePXL > 0n && reserveGame > 0n)
+                  ? ammEstimate(costDNGN, reserveGame, reservePXL) : 0n
+                return (
+                  <div key={itemId} className="bg-surface-50 rounded-xl p-4 border border-surface-100">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold text-surface-800">{DUNGEON_ITEMS[itemId]}</span>
+                      <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{dropRate}% drop rate</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <p className="stat-label">Expected cost</p>
+                        <p className="font-mono font-medium text-violet-600">{parseFloat(formatEther(costDNGN)).toFixed(1)} DNGN</p>
+                      </div>
+                      <div>
+                        <p className="stat-label">Floor in PXL</p>
+                        <p className="font-mono font-medium text-brand-600">
+                          {floorPXL > 0n ? parseFloat(formatEther(floorPXL)).toFixed(2) : '—'} PXL
+                        </p>
+                      </div>
+                      <div>
+                        <p className="stat-label">Swap path</p>
+                        <p className="text-surface-500">DNGN → PXL → Buy</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Harvest item */}
+          <div className="card p-5 space-y-3">
+            <h3 className="section-title text-sm">Harvest Field — Item Value</h3>
+            <div className="bg-surface-50 rounded-xl p-4 border border-surface-100">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-semibold text-surface-800">Seasonal Harvest Item</span>
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Guaranteed drop</span>
+              </div>
+              <p className="text-xs text-surface-500">
+                Earned as a byproduct of HRV staking (100 blocks). Since staked tokens are returned with rewards,
+                the direct production cost is near zero — making these items pure bonus value.
+              </p>
+              <div className="mt-2 text-xs">
+                <p className="stat-label">Cross-game path</p>
+                <p className="text-surface-600">Sell for PXL → Swap PXL → DNGN → Run dungeon</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cross-game exchange insight */}
+          <div className="card p-5 space-y-3">
+            <h3 className="section-title text-sm">Cross-Game Item Exchange</h3>
+            <p className="text-xs text-surface-500">
+              All items from any game can be traded on the Marketplace for PXL.
+              PXL is the universal intermediary — swap between any game economy.
+            </p>
+            <div className="flex items-center justify-center gap-2 py-3 text-sm">
+              <span className="bg-violet-100 text-violet-700 px-3 py-1.5 rounded-lg font-medium">DNGN Items</span>
+              <span className="text-surface-300">→</span>
+              <span className="bg-brand-100 text-brand-700 px-3 py-1.5 rounded-lg font-bold">PXL</span>
+              <span className="text-surface-300">→</span>
+              <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-medium">HRV Items</span>
+            </div>
+            <p className="text-xs text-surface-400 text-center">
+              Sell dungeon loot → Swap to HRV → Stake for harvest rewards (or vice versa)
+            </p>
           </div>
         </div>
       )}

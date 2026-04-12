@@ -38,3 +38,18 @@ export const BASE_REWARD_RATE = 10000000000000000n // 1e16
 
 // DungeonDrops constants
 export const DUNGEON_ENTRY_FEE = 10000000000000000000n // 10e18 = 10 DNGN
+
+// Drop rates (out of 100) — used for floor price computation
+export const DUNGEON_DROP_RATES: Record<number, number> = {
+  1: 60,  // Common Sword: 60%
+  2: 30,  // Rare Shield: 30%
+  3: 10,  // Legendary Crown: 10%
+}
+
+// Expected production cost in DNGN (entry_fee / drop_rate)
+// Common Sword: 10 / 0.6 ≈ 16.67, Rare Shield: 10 / 0.3 ≈ 33.33, Crown: 10 / 0.1 = 100
+export const DUNGEON_EXPECTED_COST: Record<number, bigint> = {
+  1: 16666666666666666667n,  // ~16.67 DNGN
+  2: 33333333333333333333n,  // ~33.33 DNGN
+  3: 100000000000000000000n, // 100 DNGN
+}
