@@ -42,6 +42,7 @@ export default function DEX() {
     HRV: { reservePXL: 0n, reserveGame: 0n, price: 0n },
   })
   const [lpBalances, setLpBalances] = useState<Record<GameToken, bigint>>({ DNGN: 0n, HRV: 0n })
+  const [ratings, setRatings] = useState<Record<GameToken, bigint>>({ DNGN: 100n, HRV: 100n })
   const [selectedGame, setSelectedGame] = useState<GameToken>('DNGN')
   const [direction, setDirection] = useState<SwapDirection>('pxlToGame')
   const [inputAmount, setInputAmount] = useState('')
@@ -87,6 +88,12 @@ export default function DEX() {
         publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'lpShares', args: [GAME_IDS.HRV, tba] }) as Promise<bigint>,
       ])
       setLpBalances({ DNGN: dngnLp, HRV: hrvLp })
+      // Fetch game ratings
+      const [dngnRating, hrvRating] = await Promise.all([
+        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.DUNGEON] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.HARVEST] }) as Promise<bigint>,
+      ])
+      setRatings({ DNGN: dngnRating, HRV: hrvRating })
     } catch (err) {
       console.error('DEX fetch error:', err)
       toast.error('Failed to load DEX data')
@@ -315,92 +322,59 @@ export default function DEX() {
       {/* ECONOMICS TAB */}
       {tab === 'economics' && (
         <div className="space-y-4">
-          {/* How it works */}
+          {/* Item price table */}
           <div className="card p-5 space-y-3">
-            <h3 className="section-title text-sm">AMM-Informed Item Pricing</h3>
-            <p className="text-xs text-surface-500">
-              PixelVault uniquely connects game economies through transparent on-chain price discovery.
-              Every in-game item has a computable floor price based on its production cost and DEX exchange rates.
-            </p>
-            <div className="bg-surface-50 rounded-xl p-3 border border-surface-100 text-xs text-surface-600 font-mono">
-              floor_pxl = (entry_fee / drop_rate) × DNGN→PXL rate
+            <div className="flex items-center justify-between">
+              <h3 className="section-title text-sm">Item Floor Prices</h3>
+              <span className="text-xs text-surface-400">Rating: {(Number(ratings.DNGN) / 100).toFixed(1)}★</span>
             </div>
-          </div>
-
-          {/* Dungeon item floor prices */}
-          <div className="card p-5 space-y-3">
-            <h3 className="section-title text-sm">Dungeon Drops — Item Floor Prices</h3>
             <div className="space-y-2">
               {([1, 2, 3] as const).map(itemId => {
                 const costDNGN = DUNGEON_EXPECTED_COST[itemId]
                 const dropRate = DUNGEON_DROP_RATES[itemId]
                 const { reservePXL, reserveGame } = pools.DNGN
-                const floorPXL = (reservePXL > 0n && reserveGame > 0n)
+                const basePXL = (reservePXL > 0n && reserveGame > 0n)
                   ? ammEstimate(costDNGN, reserveGame, reservePXL) : 0n
+                const floorPXL = basePXL * ratings.DNGN / 100n
                 return (
-                  <div key={itemId} className="bg-surface-50 rounded-xl p-4 border border-surface-100">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-semibold text-surface-800">{DUNGEON_ITEMS[itemId]}</span>
-                      <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{dropRate}% drop rate</span>
+                  <div key={itemId} className="flex items-center justify-between bg-surface-50 rounded-xl px-4 py-3 border border-surface-100">
+                    <div>
+                      <p className="text-sm font-semibold text-surface-800">{DUNGEON_ITEMS[itemId]}</p>
+                      <p className="text-xs text-surface-400">{dropRate}% drop · {parseFloat(formatEther(costDNGN)).toFixed(1)} DNGN cost</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 text-xs">
-                      <div>
-                        <p className="stat-label">Expected cost</p>
-                        <p className="font-mono font-medium text-violet-600">{parseFloat(formatEther(costDNGN)).toFixed(1)} DNGN</p>
-                      </div>
-                      <div>
-                        <p className="stat-label">Floor in PXL</p>
-                        <p className="font-mono font-medium text-brand-600">
-                          {floorPXL > 0n ? parseFloat(formatEther(floorPXL)).toFixed(2) : '—'} PXL
-                        </p>
-                      </div>
-                      <div>
-                        <p className="stat-label">Swap path</p>
-                        <p className="text-surface-500">DNGN → PXL → Buy</p>
-                      </div>
-                    </div>
+                    <p className="text-sm font-bold font-mono text-surface-900">
+                      {floorPXL > 0n ? parseFloat(formatEther(floorPXL)).toFixed(2) : '—'} <span className="text-surface-400 font-normal">PXL</span>
+                    </p>
                   </div>
                 )
               })}
-            </div>
-          </div>
-
-          {/* Harvest item */}
-          <div className="card p-5 space-y-3">
-            <h3 className="section-title text-sm">Harvest Field — Item Value</h3>
-            <div className="bg-surface-50 rounded-xl p-4 border border-surface-100">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-semibold text-surface-800">Seasonal Harvest Item</span>
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Guaranteed drop</span>
-              </div>
-              <p className="text-xs text-surface-500">
-                Earned as a byproduct of HRV staking (100 blocks). Since staked tokens are returned with rewards,
-                the direct production cost is near zero — making these items pure bonus value.
-              </p>
-              <div className="mt-2 text-xs">
-                <p className="stat-label">Cross-game path</p>
-                <p className="text-surface-600">Sell for PXL → Swap PXL → DNGN → Run dungeon</p>
+              {/* Harvest item */}
+              <div className="flex items-center justify-between bg-surface-50 rounded-xl px-4 py-3 border border-surface-100">
+                <div>
+                  <p className="text-sm font-semibold text-surface-800">Seasonal Harvest Item</p>
+                  <p className="text-xs text-surface-400">Guaranteed · Staking byproduct</p>
+                </div>
+                <p className="text-sm font-bold font-mono text-surface-900">
+                  {(() => {
+                    const { reservePXL, reserveGame } = pools.HRV
+                    if (reservePXL === 0n || reserveGame === 0n) return '—'
+                    const basePXL = ammEstimate(1000000000000000000n, reserveGame, reservePXL)
+                    return parseFloat(formatEther(basePXL * ratings.HRV / 100n)).toFixed(2)
+                  })()} <span className="text-surface-400 font-normal">PXL</span>
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Cross-game exchange insight */}
-          <div className="card p-5 space-y-3">
-            <h3 className="section-title text-sm">Cross-Game Item Exchange</h3>
-            <p className="text-xs text-surface-500">
-              All items from any game can be traded on the Marketplace for PXL.
-              PXL is the universal intermediary — swap between any game economy.
-            </p>
-            <div className="flex items-center justify-center gap-2 py-3 text-sm">
-              <span className="bg-violet-100 text-violet-700 px-3 py-1.5 rounded-lg font-medium">DNGN Items</span>
+          {/* Cross-game flow — visual only */}
+          <div className="card p-4">
+            <div className="flex items-center justify-center gap-2 text-sm">
+              <span className="px-3 py-1.5 rounded-lg border border-surface-200 font-medium text-surface-700">DNGN Items</span>
               <span className="text-surface-300">→</span>
-              <span className="bg-brand-100 text-brand-700 px-3 py-1.5 rounded-lg font-bold">PXL</span>
+              <span className="px-3 py-1.5 rounded-lg border border-surface-200 font-bold text-surface-900">PXL</span>
               <span className="text-surface-300">→</span>
-              <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg font-medium">HRV Items</span>
+              <span className="px-3 py-1.5 rounded-lg border border-surface-200 font-medium text-surface-700">HRV Items</span>
             </div>
-            <p className="text-xs text-surface-400 text-center">
-              Sell dungeon loot → Swap to HRV → Stake for harvest rewards (or vice versa)
-            </p>
           </div>
         </div>
       )}

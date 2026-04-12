@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { DUNGEON_ITEMS, HARVEST_ITEMS, BADGE_NAMES } from '../lib/constants'
+import TradingAdvisor from '../components/TradingAdvisor'
 import toast from 'react-hot-toast'
 
 export default function ProfileDashboard() {
@@ -224,6 +225,9 @@ export default function ProfileDashboard() {
           </div>
         )}
       </div>
+
+      {/* AI Trading Advisor */}
+      <TradingAdvisor />
 
       {/* Quick Nav */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

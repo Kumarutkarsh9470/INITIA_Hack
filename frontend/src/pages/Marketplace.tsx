@@ -33,6 +33,7 @@ export default function Marketplace() {
     DNGN: { reservePXL: 0n, reserveGame: 0n },
     HRV: { reservePXL: 0n, reserveGame: 0n },
   })
+  const [ratings, setRatings] = useState<{ DNGN: bigint; HRV: bigint }>({ DNGN: 100n, HRV: 100n })
 
   const fetchData = async () => {
     if (!tba) return
@@ -46,6 +47,13 @@ export default function Marketplace() {
       }
       const [dngnPool, hrvPool] = await Promise.all([fetchPool(GAME_IDS.DUNGEON), fetchPool(GAME_IDS.HARVEST)])
       setPools({ DNGN: dngnPool, HRV: hrvPool })
+
+      // Fetch game ratings
+      const [dngnRating, hrvRating] = await Promise.all([
+        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.DUNGEON] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.HARVEST] }) as Promise<bigint>,
+      ])
+      setRatings({ DNGN: dngnRating, HRV: hrvRating })
 
       const nextIdRaw = await publicClient.readContract({ address: contracts.marketplace.address, abi: contracts.marketplace.abi, functionName: 'nextListingId' })
       const nextId = Number(nextIdRaw)
@@ -74,25 +82,25 @@ export default function Marketplace() {
 
   useEffect(() => { fetchData() }, [tba, contracts])
 
-  // Floor price: convert expected DNGN cost to PXL via AMM
+  // Floor price: convert expected DNGN cost to PXL via AMM, scaled by game rating
   const getFloorPricePXL = useCallback((collection: string, itemId: bigint): bigint | null => {
     if (collection === contracts.dungeonDropsAssets.address) {
       const costInDNGN = DUNGEON_EXPECTED_COST[Number(itemId)]
       if (!costInDNGN) return null
       const { reservePXL, reserveGame } = pools.DNGN
       if (reservePXL === 0n || reserveGame === 0n) return null
-      // How much PXL would you get for costInDNGN DNGN? That's the floor.
-      return ammEstimate(costInDNGN, reserveGame, reservePXL)
+      const basePXL = ammEstimate(costInDNGN, reserveGame, reservePXL)
+      // Scale by rating: rating 100=1star, 200=2star, etc. Multiply by rating/100
+      return basePXL * ratings.DNGN / 100n
     }
     if (collection === contracts.harvestFieldAssets.address) {
-      // Harvest items are byproducts of staking — minimal direct cost
-      // Floor ≈ opportunity cost, approximate as 1 HRV worth of PXL
       const { reservePXL, reserveGame } = pools.HRV
       if (reservePXL === 0n || reserveGame === 0n) return null
-      return ammEstimate(1000000000000000000n, reserveGame, reservePXL) // 1 HRV → PXL
+      const basePXL = ammEstimate(1000000000000000000n, reserveGame, reservePXL)
+      return basePXL * ratings.HRV / 100n
     }
     return null
-  }, [contracts, pools])
+  }, [contracts, pools, ratings])
 
   const getDropRate = (collection: string, itemId: bigint): number | null => {
     if (collection === contracts.dungeonDropsAssets.address) {
@@ -218,12 +226,10 @@ export default function Marketplace() {
 
           {/* Floor Price Legend */}
           {(pools.DNGN.reservePXL > 0n || pools.HRV.reservePXL > 0n) && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3 mb-4 text-sm">
-              <p className="font-semibold text-amber-800 text-xs uppercase tracking-wider mb-1">AMM-Informed Floor Prices</p>
-              <p className="text-amber-700 text-xs">
-                Floor prices are computed from each item's production cost (entry fee / drop rate) converted to PXL via the DEX.
-                Listings below floor are potential bargains.
-              </p>
+            <div className="bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 mb-4 flex items-center gap-2 text-xs text-surface-500">
+              <span className="text-surface-400">Floor prices from DEX rates</span>
+              <span className="text-surface-300">·</span>
+              <span className="text-surface-400">Green = below floor</span>
             </div>
           )}
 
@@ -352,14 +358,14 @@ export default function Marketplace() {
                   if (!floor || floor === 0n) return null
                   const floorStr = parseFloat(formatEther(floor)).toFixed(2)
                   return (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                      <p className="font-semibold text-amber-800 mb-0.5">Pricing Guide</p>
-                      <p>Production floor: <span className="font-mono font-semibold">{floorStr} PXL</span>
-                        {dropRate && <span className="ml-1">({dropRate}% drop rate)</span>}
-                      </p>
-                      <p className="mt-0.5">Listing below this price means buyers get a deal!</p>
+                    <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-xs text-surface-500">
+                      <div className="flex items-center justify-between">
+                        <span>Production floor</span>
+                        <span className="font-mono font-semibold text-surface-700">{floorStr} PXL</span>
+                      </div>
+                      {dropRate && <p className="text-surface-400 mt-0.5">{dropRate}% drop rate</p>}
                       <button type="button" onClick={() => setListPricePXL(floorStr)}
-                        className="mt-1.5 text-amber-800 underline hover:text-amber-900 font-medium">
+                        className="mt-1.5 text-brand-600 hover:text-brand-700 text-xs font-medium">
                         Use floor price
                       </button>
                     </div>
