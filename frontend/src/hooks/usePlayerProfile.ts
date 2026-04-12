@@ -15,6 +15,7 @@ interface PlayerProfileData {
   username: string
   reputation: bigint
   isLoading: boolean
+  error: string | null
   refetch: () => void
   mint: (username: string) => Promise<void>
 }
@@ -28,6 +29,7 @@ export function usePlayerProfile(): PlayerProfileData {
   const [username, setUsername] = useState('')
   const [reputation, setReputation] = useState(0n)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchProfile = useCallback(async () => {
     if (!initiaAddress) {
@@ -37,6 +39,7 @@ export function usePlayerProfile(): PlayerProfileData {
 
     try {
       setIsLoading(true)
+      setError(null)
       const hex = AccAddress.toHex(initiaAddress)
       const ownerAddress = (hex.startsWith('0x') ? hex : `0x${hex}`) as `0x${string}`
 
@@ -104,6 +107,7 @@ export function usePlayerProfile(): PlayerProfileData {
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
+      setError('Unable to connect to the network. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -193,6 +197,7 @@ export function usePlayerProfile(): PlayerProfileData {
     username,
     reputation,
     isLoading,
+    error,
     refetch: fetchProfile,
     mint,
   }

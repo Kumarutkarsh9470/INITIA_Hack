@@ -109,26 +109,17 @@ export default function ProfileDashboard() {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card p-5">
-          <p className="stat-label">Total Tokens</p>
-          <p className="text-2xl font-bold text-surface-900 mt-1">{totalTokenValue.toFixed(2)}</p>
-        </div>
-        <div className="card p-5">
-          <p className="stat-label">Reputation</p>
-          <p className="text-2xl font-bold text-surface-900 mt-1">{reputation.toString()}</p>
-        </div>
-        <div className="card p-5">
-          <p className="stat-label">Items Owned</p>
-          <p className="text-2xl font-bold text-surface-900 mt-1">
-            {Object.values(dungeonItems).reduce((a, b) => a + b, 0n).toString()}
-          </p>
-        </div>
-        <div className="card p-5">
-          <p className="stat-label">Badges Earned</p>
-          <p className="text-2xl font-bold text-surface-900 mt-1">
-            {Object.values(badges).filter(b => b > 0n).length}
-          </p>
-        </div>
+        {[
+          { label: 'Total Tokens', value: totalTokenValue.toFixed(2) },
+          { label: 'Reputation', value: reputation.toString() },
+          { label: 'Items Owned', value: Object.values(dungeonItems).reduce((a, b) => a + b, 0n).toString() },
+          { label: 'Badges Earned', value: Object.values(badges).filter(b => b > 0n).length.toString() },
+        ].map((stat, i) => (
+          <div key={stat.label} className="card p-5 animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
+            <p className="stat-label">{stat.label}</p>
+            <p className="text-2xl font-bold text-surface-900 mt-1">{stat.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Faucet claim banner — shown when all balances are zero */}

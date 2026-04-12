@@ -150,7 +150,7 @@ export default function HarvestField() {
 
       {/* Not staking */}
       {!isStaking && (
-        <div className="card p-6 space-y-5">
+        <div className="card p-6 space-y-5 animate-fade-in-up">
           <div>
             <h2 className="section-title">Start Staking</h2>
             <p className="text-surface-500 text-sm mt-0.5">Lock HRV for 100 blocks and earn proportional rewards.</p>

@@ -37,19 +37,25 @@
 
 @layer components {
   .card {
-    @apply bg-white border border-surface-200 rounded-2xl shadow-card;
+    @apply bg-white border border-surface-200 rounded-2xl shadow-card
+           transition-all duration-300 ease-out;
   }
   .card-hover {
-    @apply bg-white border border-surface-200 rounded-2xl shadow-card hover:shadow-card-hover hover:border-surface-300 transition-all duration-200;
+    @apply bg-white border border-surface-200 rounded-2xl shadow-card
+           hover:shadow-card-hover hover:border-surface-300 hover:-translate-y-0.5
+           transition-all duration-300 ease-out;
   }
   .btn-primary {
-    @apply bg-surface-900 hover:bg-surface-800 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 active:scale-[0.98];
+    @apply bg-surface-900 hover:bg-surface-800 text-white font-semibold px-6 py-3 rounded-xl 
+           transition-all duration-200 active:scale-[0.97] hover:shadow-md;
   }
   .btn-secondary {
-    @apply bg-surface-100 hover:bg-surface-200 text-surface-700 font-medium px-5 py-2.5 rounded-xl border border-surface-200 transition-all duration-200;
+    @apply bg-surface-100 hover:bg-surface-200 text-surface-700 font-medium px-5 py-2.5 rounded-xl 
+           border border-surface-200 transition-all duration-200 active:scale-[0.98];
   }
   .btn-ghost {
-    @apply text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium px-4 py-2 rounded-xl transition-all duration-200;
+    @apply text-surface-600 hover:text-surface-900 hover:bg-surface-100 font-medium px-4 py-2 rounded-xl 
+           transition-all duration-200;
   }
   .input-field {
     @apply w-full bg-white border border-surface-300 text-surface-900 rounded-xl px-4 py-3 
@@ -70,5 +76,22 @@
   }
   .page-title {
     @apply text-3xl font-bold text-surface-900 tracking-tight;
+  }
+}
+
+/* Staggered animations need fill-mode on the base element */
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fade-in-up 0.4s ease-out forwards;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

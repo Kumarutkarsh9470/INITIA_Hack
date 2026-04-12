@@ -15,11 +15,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
     const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req.body),
+      signal: controller.signal,
     })
+    clearTimeout(timeout)
 
     const data = await response.text()
     res.setHeader('Content-Type', 'application/json')

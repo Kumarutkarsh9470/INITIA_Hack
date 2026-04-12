@@ -89,12 +89,12 @@ export default function GasSettings() {
         <h2 className="section-title">Exchange Rates</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-surface-50 rounded-xl p-3 border border-surface-100">
-            <p className="stat-label mb-1">DNGN → PXL</p>
-            <p className="font-bold text-violet-600">{rates.dngn > 0n ? formatEther(rates.dngn) : '—'} PXL</p>
+            <p className="stat-label mb-1">1 PXL costs</p>
+            <p className="font-bold text-violet-600">{rates.dngn > 0n ? formatEther(rates.dngn) : '—'} DNGN</p>
           </div>
           <div className="bg-surface-50 rounded-xl p-3 border border-surface-100">
-            <p className="stat-label mb-1">HRV → PXL</p>
-            <p className="font-bold text-emerald-600">{rates.hrv > 0n ? formatEther(rates.hrv) : '—'} PXL</p>
+            <p className="stat-label mb-1">1 PXL costs</p>
+            <p className="font-bold text-emerald-600">{rates.hrv > 0n ? formatEther(rates.hrv) : '—'} HRV</p>
           </div>
         </div>
       </div>

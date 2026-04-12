@@ -134,8 +134,8 @@ export default function Landing() {
           ERC-721 identity + ERC-6551 TBA + ERC-1155 items + AMM DEX
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="card-hover p-6">
+          {FEATURES.map((f, i) => (
+            <div key={f.title} className="card-hover p-6 animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
               <h3 className="font-semibold text-surface-900 mb-2">{f.title}</h3>
               <p className="text-surface-500 text-sm leading-relaxed">{f.desc}</p>
             </div>

@@ -119,10 +119,11 @@ export default function GameHub() {
           </div>
         ) : (
           <div className="space-y-3">
-            {games.map((game) => (
+            {games.map((game, i) => (
               <div
                 key={game.id}
-                className="flex items-center justify-between bg-surface-50 rounded-xl px-5 py-4 border border-surface-100 hover:border-surface-300 transition-all"
+                className="flex items-center justify-between bg-surface-50 rounded-xl px-5 py-4 border border-surface-100 hover:border-surface-300 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-300 animate-fade-in-up"
+                style={{ animationDelay: `${i * 100}ms` }}
               >
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-surface-200 flex items-center justify-center text-sm font-bold text-surface-600">

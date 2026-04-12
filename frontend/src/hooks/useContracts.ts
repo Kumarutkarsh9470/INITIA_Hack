@@ -21,7 +21,11 @@ import {
 const JSON_RPC_URL = import.meta.env.VITE_JSON_RPC_URL ?? `${window.location.origin}/evm-rpc`
 
 export const publicClient = createPublicClient({
-  transport: http(JSON_RPC_URL),
+  transport: http(JSON_RPC_URL, {
+    retryCount: 3,
+    retryDelay: 1000,
+    timeout: 15_000,
+  }),
   batch: { multicall: true },
 })
 

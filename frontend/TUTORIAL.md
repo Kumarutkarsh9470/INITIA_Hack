@@ -19,7 +19,8 @@ After connecting, you land on the **Create Profile** page.
 > All in-game assets, tokens, and items are owned by your TBA, not your EOA directly.
 
 
-
+cd /root/try/pixelvault/frontend
+vercel
 ## 4. Dashboard
 
 The **Dashboard** (`/profile`) shows:

@@ -136,19 +136,19 @@ export default function DungeonDrops() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="card p-4">
+        <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '0ms' }}>
           <p className="stat-label">Balance</p>
           <p className="text-xl font-bold text-surface-900 mt-1">
             {isLoadingData ? '—' : parseFloat(formatEther(dngnBalance)).toFixed(1)}
           </p>
           <p className="text-xs text-surface-400">DNGN</p>
         </div>
-        <div className="card p-4">
+        <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <p className="stat-label">Entry Fee</p>
           <p className="text-xl font-bold text-surface-900 mt-1">10</p>
           <p className="text-xs text-surface-400">DNGN</p>
         </div>
-        <div className="card p-4">
+        <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
           <p className="stat-label">Your Runs</p>
           <p className="text-xl font-bold text-surface-900 mt-1">
             {isLoadingData ? '—' : playerNonce.toString()}

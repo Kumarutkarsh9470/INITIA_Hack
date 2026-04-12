@@ -53,20 +53,23 @@ export default function Marketplace() {
 
   useEffect(() => { fetchData() }, [tba, contracts])
 
-  const handleBuy = async (listing: Listing) => {
+  const handleBuy = async (listing: Listing, buyAmount?: bigint) => {
     if (!tba) return toast.error('Wallet not connected')
+    const qty = buyAmount ?? listing.amount
+    const totalCost = listing.priceInPXL * qty
     try {
       toast.loading('Approving PXL...', { id: 'buy-toast' })
       await execute(contracts.pxlToken.address, 0n,
-        encodeFunctionData({ abi: contracts.pxlToken.abi, functionName: 'approve', args: [contracts.marketplace.address, listing.priceInPXL] }))
+        encodeFunctionData({ abi: contracts.pxlToken.abi, functionName: 'approve', args: [contracts.marketplace.address, totalCost] }))
       toast.loading('Purchasing item...', { id: 'buy-toast' })
       await execute(contracts.marketplace.address, 0n,
-        encodeFunctionData({ abi: contracts.marketplace.abi, functionName: 'buyItem', args: [listing.id, listing.amount, contracts.pxlToken.address, listing.priceInPXL] }))
+        encodeFunctionData({ abi: contracts.marketplace.abi, functionName: 'buyItem', args: [listing.id, qty, contracts.pxlToken.address, totalCost] }))
       toast.success('Purchase successful!', { id: 'buy-toast' })
       fetchData()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Buy failed:', error)
-      toast.error('Transaction failed', { id: 'buy-toast' })
+      const msg = error?.message?.includes('Reverted') ? 'Transaction reverted — you may not have enough PXL' : 'Transaction failed'
+      toast.error(msg, { id: 'buy-toast' })
     }
   }
 
@@ -139,8 +142,8 @@ export default function Marketplace() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {listings.map(listing => (
-                <div key={listing.id.toString()} className="card-hover p-5 flex flex-col justify-between">
+              {listings.map((listing, i) => (
+                <div key={listing.id.toString()} className="card-hover p-5 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
                   <div>
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-bold text-surface-900">{getItemName(listing.collection, listing.itemId)}</h3>
@@ -151,8 +154,11 @@ export default function Marketplace() {
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-100">
                     <div>
-                      <p className="stat-label">Price</p>
+                      <p className="stat-label">Price per item</p>
                       <p className="font-bold text-brand-600">{formatEther(listing.priceInPXL)} PXL</p>
+                      {listing.amount > 1n && (
+                        <p className="text-xs text-surface-400">Total: {formatEther(listing.priceInPXL * listing.amount)} PXL</p>
+                      )}
                     </div>
                     <button onClick={() => handleBuy(listing)}
                       disabled={isPending || listing.seller.toLowerCase() === tba?.toLowerCase()}
@@ -219,19 +225,23 @@ export default function Marketplace() {
                   <p className="text-xs text-surface-400 mt-1">Max: {selectedItem.balance.toString()}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-surface-500 uppercase tracking-wider block mb-1">Total Price (PXL)</label>
+                  <label className="text-xs font-medium text-surface-500 uppercase tracking-wider block mb-1">Price Per Item (PXL)</label>
                   <input type="number" step="0.01" min="0" value={listPricePXL}
                     onChange={e => setListPricePXL(e.target.value)} className="input-field" placeholder="e.g. 50" required />
                 </div>
                 {listPricePXL && !isNaN(Number(listPricePXL)) && (
                   <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-sm space-y-1">
                     <div className="flex justify-between text-surface-500">
+                      <span>Total ({listAmount}× {Number(listPricePXL).toFixed(2)})</span>
+                      <span>{(Number(listPricePXL) * Number(listAmount)).toFixed(2)} PXL</span>
+                    </div>
+                    <div className="flex justify-between text-surface-500">
                       <span>Marketplace Fee (2.5%)</span>
-                      <span>-{(Number(listPricePXL) * 0.025).toFixed(2)} PXL</span>
+                      <span>-{(Number(listPricePXL) * Number(listAmount) * 0.025).toFixed(2)} PXL</span>
                     </div>
                     <div className="flex justify-between font-semibold text-emerald-600">
                       <span>You Receive</span>
-                      <span>{(Number(listPricePXL) * 0.975).toFixed(2)} PXL</span>
+                      <span>{(Number(listPricePXL) * Number(listAmount) * 0.975).toFixed(2)} PXL</span>
                     </div>
                   </div>
                 )}
