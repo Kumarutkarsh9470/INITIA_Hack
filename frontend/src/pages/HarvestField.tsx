@@ -184,6 +184,8 @@ export default function HarvestField() {
     ? estimatedReward + (estimatedReward * 15n / 100n)
     : estimatedReward
 
+  const insufficientForGas = usePaymaster && hrvBalance < GAS_COST_HRV && stakedAmount === 0n
+
   return (
     <div className="space-y-6 max-w-lg">
       <div className="flex items-center justify-between">
@@ -216,6 +218,11 @@ export default function HarvestField() {
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${usePaymaster ? 'translate-x-5' : ''}`} />
           </button>
         </div>
+        {insufficientForGas && (
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
+            You need at least 5 HRV for gas fees. Toggle off to use native GAS, or get more HRV from the DEX.
+          </p>
+        )}
       </div>
 
       {/* Item Utility - Seasonal Harvest Item */}

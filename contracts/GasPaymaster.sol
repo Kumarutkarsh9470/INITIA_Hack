@@ -66,7 +66,7 @@ contract GasPaymaster is ReentrancyGuard {
             pxlToken.safeTransfer(playerTBA, pxlRefund);
         }
 
-        emit GasSponsored(playerTBA, gameToken, pxlUsed, pxlReceived, target, success);
+        emit GasSponsored(playerTBA, gameToken, maxGameTokens, pxlReceived, target, success);
 
         // Re-throw the original error if the call failed [cite: 1019-1026]
         if (!success) {
