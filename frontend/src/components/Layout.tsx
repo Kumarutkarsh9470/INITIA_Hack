@@ -8,7 +8,7 @@ const NAV_ITEMS = [
   { to: '/games', label: 'Games' },
   { to: '/dex', label: 'DEX' },
   { to: '/marketplace', label: 'Market' },
-  { to: '/barter', label: 'Barter' },
+  { to: '/gas', label: 'Gas' },
   { to: '/sdk', label: 'SDK' },
 ]
 

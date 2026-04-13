@@ -1,6 +1,6 @@
 {
   "repo_url": "https://github.com/Kumarutkarsh9470/INITIA_Hack",
-  "commit_sha": "FILL_AFTER_FINAL_PUSH",
+  "commit_sha": "e4501e1d75c83cd8fe23c1fec3cc9ee22d5b7f94",
   "rollup_chain_id": "trying",
   "deployed_address": {
     "PXLToken": "0x9317c2bc53aa77A52dEFfd06b62e41bFa6b64cc4",
@@ -17,8 +17,9 @@
     "CommonRelic": "0x4f922647E0aaC41D6B4C451A44D7B0f6409dB99a"
   },
   "vm": "minievm",
+  "deployed_url": "https://pixelvault-two.vercel.app",
   "native_feature": "ERC-6551 Token Bound Accounts for player asset ownership, session keys via InterwovenKit, and meta-transaction gas abstraction via GasPaymaster (ERC-2771 forwarding with on-chain DEX swap)",
   "core_logic_path": "contracts/",
   "native_feature_frontend_path": "frontend/src/",
-  "demo_video_url": "FILL_BEFORE_SUBMISSION"
+  "demo_video_url": "https://pixelvault-two.vercel.app"
 }

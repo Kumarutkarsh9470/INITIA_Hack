@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 
 export default function CreateProfile() {
   const { initiaAddress, openConnect } = useInterwovenKit()
-  const { hasProfile, isLoading, mint } = usePlayerProfile()
+  const { hasProfile, isLoading, error, mint, refetch } = usePlayerProfile()
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [isMinting, setIsMinting] = useState(false)
@@ -32,7 +32,13 @@ export default function CreateProfile() {
       setMintStatus('Checking account...')
       const hex = AccAddress.toHex(initiaAddress!)
       const evmAddress = (hex.startsWith('0x') ? hex : `0x${hex}`) as `0x${string}`
-      const balance = await publicClient.getBalance({ address: evmAddress })
+
+      let balance: bigint
+      try {
+        balance = await publicClient.getBalance({ address: evmAddress })
+      } catch {
+        throw new Error('Cannot reach the network. Please try again in a moment.')
+      }
 
       if (balance === 0n) {
         setMintStatus('Funding account with GAS...')
@@ -76,7 +82,14 @@ export default function CreateProfile() {
           </p>
         </div>
 
-        {!initiaAddress ? (
+        {error ? (
+          <div className="text-center space-y-3">
+            <p className="text-sm text-red-500">{error}</p>
+            <button onClick={refetch} className="btn-primary w-full">
+              Retry Connection
+            </button>
+          </div>
+        ) : !initiaAddress ? (
           <button onClick={openConnect} className="btn-primary w-full">
             Connect Wallet First
           </button>

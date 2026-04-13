@@ -1,5 +1,22 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
+async function fetchWithRetry(url: string, opts: RequestInit, retries = 2): Promise<Response> {
+  let lastError: Error | null = null
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
+      const response = await fetch(url, { ...opts, signal: controller.signal })
+      clearTimeout(timeout)
+      return response
+    } catch (err: any) {
+      lastError = err
+      if (i < retries) await new Promise(r => setTimeout(r, 500 * (i + 1)))
+    }
+  }
+  throw lastError
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -19,15 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = `${rpcUrl}${subPath}`
 
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000)
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       method: req.method || 'GET',
       headers: { 'Content-Type': 'application/json' },
       body: req.method === 'POST' ? JSON.stringify(req.body) : undefined,
-      signal: controller.signal,
     })
-    clearTimeout(timeout)
 
     const data = await response.text()
     res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json')
