@@ -102,7 +102,7 @@ for attempt in $(seq 1 8); do
 done
 echo "✓ EVM tunnel verified"
 
-for attempt in $(seq 1 8); do
+for attempt in $(seq 1 20); do
   REST_TEST=$(curl -sS -m 10 "$COSMOS_REST_URL/cosmos/base/tendermint/v1beta1/node_info" 2>&1 | head -c 100 || true)
   if echo "$REST_TEST" | grep -q "node_info"; then
     break
@@ -112,7 +112,7 @@ for attempt in $(seq 1 8); do
     exit 1
   fi
   echo "  Cosmos REST tunnel not ready yet (attempt $attempt/8)..."
-  sleep 3
+  sleep 5
 done
 echo "✓ Cosmos REST tunnel verified"
 echo ""
