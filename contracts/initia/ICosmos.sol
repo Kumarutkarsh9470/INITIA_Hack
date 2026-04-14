@@ -14,4 +14,17 @@ interface ICosmos {
     function to_erc20(string memory denom) external view returns (address erc20_address);
     function disable_execute_cosmos() external returns (bool dummy);
     function execute_cosmos(string memory msg, uint64 gas_limit) external returns (bool dummy);
+
+    struct Options {
+        bool allow_failure;
+        uint64 callback_id;
+    }
+
+    function execute_cosmos_with_options(
+        string memory msg,
+        uint64 gas_limit,
+        Options memory options
+    ) external returns (bool dummy);
+
+    function query_cosmos(string memory path, string memory req) external returns (string memory result);
 }

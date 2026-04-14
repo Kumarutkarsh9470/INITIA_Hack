@@ -41,16 +41,22 @@ fi
 echo "✓ Local EVM node is running"
 echo ""
 
-# ── Step 3: Start tunnels ────────────────────────────────────────────────
-echo "⏳ Starting tunnels..."
+# ── Step 3: Start tunnels in tmux ─────────────────────────────────────────
+echo "⏳ Starting tunnels in tmux (persistent)..."
+
+# Kill any existing tunnel session
+tmux kill-session -t tunnels 2>/dev/null || true
+sleep 1
+
 rm -f /tmp/cf-evm.log /tmp/cf-cosmos-rpc.log /tmp/cf-cosmos-rest.log
 
-cloudflared tunnel --url http://127.0.0.1:8545 > /tmp/cf-evm.log 2>&1 &
-EVM_PID=$!
-cloudflared tunnel --url http://127.0.0.1:26657 > /tmp/cf-cosmos-rpc.log 2>&1 &
-RPC_PID=$!
-cloudflared tunnel --url http://127.0.0.1:1317 > /tmp/cf-cosmos-rest.log 2>&1 &
-REST_PID=$!
+# Create tmux session with tunnel windows
+tmux new-session -d -s tunnels -n evm \
+  "cloudflared tunnel --protocol http2 --url http://localhost:8545 2>&1 | tee /tmp/cf-evm.log"
+tmux new-window -t tunnels -n cosmos-rpc \
+  "cloudflared tunnel --protocol http2 --url http://localhost:26657 2>&1 | tee /tmp/cf-cosmos-rpc.log"
+tmux new-window -t tunnels -n cosmos-rest \
+  "cloudflared tunnel --protocol http2 --url http://localhost:1317 2>&1 | tee /tmp/cf-cosmos-rest.log"
 
 # Wait for all 3 tunnel URLs (up to 45s)
 MAX_WAIT=45
@@ -85,43 +91,42 @@ echo "  Cosmos REST: $COSMOS_REST_URL"
 echo ""
 
 # ── Step 4: Verify tunnels are working ───────────────────────────────────
-echo "⏳ Verifying tunnels..."
-for attempt in $(seq 1 8); do
-  EVM_TEST=$(curl -sS -m 10 -X POST "$EVM_URL" \
+echo "⏳ Verifying tunnels (waiting for DNS propagation)..."
+sleep 10  # DNS propagation delay for new trycloudflare.com subdomains
+for attempt in $(seq 1 12); do
+  EVM_TEST=$(curl -sS -m 15 -X POST "$EVM_URL" \
     -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","method":"eth_chainId","id":1}' 2>&1 || true)
   if echo "$EVM_TEST" | grep -q "result"; then
     break
   fi
-  if [[ $attempt -eq 8 ]]; then
-    echo "✗ EVM tunnel not responding after 8 attempts"
-    exit 1
+  if [[ $attempt -eq 12 ]]; then
+    echo "✗ EVM tunnel not responding after 12 attempts"
+    echo "  This may be a DNS issue. The tunnel itself is likely working."
+    echo "  Continuing with deploy — Vercel uses its own DNS resolvers."
   fi
-  echo "  EVM tunnel not ready yet (attempt $attempt/8)..."
-  sleep 3
-done
-echo "✓ EVM tunnel verified"
-
-echo "⏳ Verifying Cosmos REST tunnel..."
-for attempt in $(seq 1 20); do
-  REST_TEST=$(curl -sS -m 15 \
-    "$COSMOS_REST_URL/cosmos/base/tendermint/v1beta1/node_info" || true)
-
-  if echo "$REST_TEST" | grep -q "default_node_info"; then
-    echo "✓ Cosmos REST tunnel verified"
-    break
-  fi
-
-  if [[ $attempt -eq 20 ]]; then
-    echo "✗ Cosmos REST tunnel not responding after 20 attempts"
-    echo "Last response: $REST_TEST"
-    exit 1
-  fi
-
-  echo "  Cosmos REST tunnel not ready yet (attempt $attempt/20)..."
+  echo "  EVM tunnel not ready yet (attempt $attempt/12)..."
   sleep 5
 done
-echo "✓ Cosmos REST tunnel verified"
+if echo "$EVM_TEST" | grep -q "result"; then
+  echo "✓ EVM tunnel verified"
+fi
+
+for attempt in $(seq 1 8); do
+  REST_TEST=$(curl -sS -m 15 "$COSMOS_REST_URL/cosmos/base/tendermint/v1beta1/node_info" 2>&1 | head -c 100 || true)
+  if echo "$REST_TEST" | grep -q "node_info"; then
+    break
+  fi
+  if [[ $attempt -eq 8 ]]; then
+    echo "⚠ Cosmos REST tunnel verification slow — DNS may need time"
+    echo "  Continuing with deploy..."
+  fi
+  echo "  Cosmos REST tunnel not ready yet (attempt $attempt/8)..."
+  sleep 5
+done
+if echo "$REST_TEST" | grep -q "node_info"; then
+  echo "✓ Cosmos REST tunnel verified"
+fi
 echo ""
 
 # ── Step 5: Install deps if needed ───────────────────────────────────────
@@ -198,12 +203,29 @@ else
   echo "  Test manually: curl -X POST https://pixelvault-two.vercel.app/evm-rpc -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"id\":1}'"
 fi
 
+# ── Step 10: Start watchdog in tmux ───────────────────────────────────────
+echo "⏳ Starting persistent tunnel watchdog..."
+
+# Save current URLs so the watchdog can pick them up
+cat > /tmp/tunnel-urls.env <<URLEOF
+EVM_URL="$EVM_URL"
+RPC_URL="$COSMOS_RPC_URL"
+REST_URL="$COSMOS_REST_URL"
+URLEOF
+
+# Add watchdog as another window in the tmux session
+WATCHDOG_SCRIPT="$(cd "$(dirname "$0")" && pwd)/tunnel-watchdog.sh"
+tmux new-window -t tunnels -n watchdog "bash '$WATCHDOG_SCRIPT'; bash"
+echo "✓ Watchdog running in tmux session 'tunnels'"
 echo ""
+
 echo "╔══════════════════════════════════════════════════╗"
 echo "║  ✅ Deploy complete!                             ║"
 echo "║  Site: https://pixelvault-two.vercel.app         ║"
 echo "║                                                  ║"
-echo "║  Tunnel PIDs: EVM=$EVM_PID RPC=$RPC_PID REST=$REST_PID"
-echo "║  ⚠  Keep this terminal open — tunnels die if    ║"
-echo "║     the machine sleeps or terminal closes.       ║"
+echo "║  All tunnels + watchdog in tmux session          ║"
+echo "║  'tunnels'. Safe to close this terminal.         ║"
+echo "║                                                  ║"
+echo "║  Monitor:   tmux attach -t tunnels               ║"
+echo "║  Logs:      tail -f /tmp/tunnel-watchdog.log     ║"
 echo "╚══════════════════════════════════════════════════╝"

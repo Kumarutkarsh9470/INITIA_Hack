@@ -14,6 +14,7 @@ interface IGameAssetCollection {
 
 import "./GameToken.sol";
 import "./GameAssetCollection.sol";
+import "./initia/IERC20Registry.sol";
 
 contract GameRegistry is Ownable {
     
@@ -83,6 +84,9 @@ contract GameRegistry is Ownable {
         tokenToGame[address(token)] = gameId;
         isRegistered[address(token)] = true;
         gameIds.push(gameId);
+
+        // Register game token with Initia's Cosmos bank module via ERC20Registry precompile
+        try ERC20_REGISTRY_CONTRACT.register_erc20_from_factory(address(token)) {} catch {}
 
         emit GameRegistered(gameId, address(token), address(assets), developer, name);
 

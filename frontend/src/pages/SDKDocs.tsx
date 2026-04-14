@@ -88,17 +88,18 @@ await marketplace.listItem(
 const ARCHITECTURE_LAYERS = [
   { name: 'Game Engine', desc: 'Unity / Unreal / Web', color: 'bg-blue-50 border-blue-200 text-blue-700' },
   { name: 'PixelVault SDK', desc: 'Read state, write actions, listen events', color: 'bg-brand-50 border-brand-200 text-brand-700' },
-  { name: 'Smart Contracts', desc: 'Source of truth for all game state', color: 'bg-surface-100 border-surface-300 text-surface-700' },
-  { name: 'Initia MiniEVM', desc: 'Shared settlement layer', color: 'bg-amber-50 border-amber-200 text-amber-700' },
+  { name: 'Smart Contracts', desc: 'Source of truth + IBC bridge + ERC20Registry', color: 'bg-surface-100 border-surface-300 text-surface-700' },
+  { name: 'Initia MiniEVM', desc: 'Cosmos precompiles + IBC channels to L1', color: 'bg-amber-50 border-amber-200 text-amber-700' },
 ]
 
 const CONTRACTS_TABLE = [
   { contract: 'PlayerProfile', role: 'ERC-721 identity NFT → creates TBA on mint', usage: 'One-time player onboarding' },
   { contract: 'ERC6551 TBA', role: 'Smart contract wallet per player', usage: 'Holds all tokens, items, badges' },
-  { contract: 'GameRegistry', role: 'Registers games, deploys tokens + items', usage: 'Game developer setup' },
-  { contract: 'GameToken', role: 'ERC-20 game-specific currency', usage: 'In-game economy (earn/spend)' },
+  { contract: 'GameRegistry', role: 'Registers games, deploys tokens + items (auto-registers with ERC20Registry)', usage: 'Game developer setup' },
+  { contract: 'GameToken', role: 'ERC-20 game-specific currency (Cosmos bank registered)', usage: 'In-game economy (earn/spend)' },
   { contract: 'GameAssetCollection', role: 'ERC-1155 item collection', usage: 'Loot, equipment, resources' },
   { contract: 'PixelVaultDEX', role: 'Constant-product AMM', usage: 'Cross-game token exchange' },
+  { contract: 'CosmoBridge', role: 'IBC token + NFT bridge to L1', usage: 'Bridge assets to Initia L1' },
   { contract: 'Marketplace', role: 'P2P item trading', usage: 'Buy/sell items across games' },
   { contract: 'AchievementBadge', role: 'Soulbound badges + reputation', usage: 'On-chain achievements' },
   { contract: 'GasPaymaster', role: 'Meta-tx relayer (ERC-2771)', usage: 'Pay gas with game tokens' },

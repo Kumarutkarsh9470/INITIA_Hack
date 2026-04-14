@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { formatEther, parseEther, encodeFunctionData } from 'viem'
-import { useInterwovenKit } from '@initia/interwovenkit-react'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
 import { GAME_IDS, DUNGEON_ITEMS, DUNGEON_EXPECTED_COST, DUNGEON_DROP_RATES } from '../lib/constants'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 type GameToken = 'DNGN' | 'HRV'
@@ -29,7 +29,6 @@ const TOKEN_COLORS: Record<string, string> = { PXL: 'text-brand-600', DNGN: 'tex
 const SLIPPAGE_BPS = 50n
 
 export default function DEX() {
-  const { openBridge } = useInterwovenKit()
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
   const { execute, isPending } = useTBA()
@@ -164,10 +163,10 @@ export default function DEX() {
           <h1 className="page-title">PixelVault DEX</h1>
           <p className="text-surface-500 text-sm mt-0.5">Swap tokens · Add liquidity · Bridge</p>
         </div>
-        <button onClick={() => openBridge?.()}
-          className="btn-secondary text-sm px-3 py-1.5">
-          Bridge
-        </button>
+        <Link to="/bridge"
+          className="btn-secondary text-sm px-3 py-1.5 inline-block">
+          IBC Bridge
+        </Link>
       </div>
 
       {/* Balances */}

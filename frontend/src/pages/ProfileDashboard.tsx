@@ -19,6 +19,7 @@ export default function ProfileDashboard() {
   const [badges, setBadges] = useState<Record<number, bigint>>({})
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isClaiming, setIsClaiming] = useState(false)
+  const [cosmosAddr, setCosmosAddr] = useState('')
 
   useEffect(() => {
     if (!tba) return
@@ -83,6 +84,17 @@ export default function ProfileDashboard() {
           b[id] = bal
         }
         setBadges(b)
+
+        // Fetch Cosmos address
+        try {
+          const cosAddr = await publicClient.readContract({
+            address: contracts.cosmoBridge.address,
+            abi: contracts.cosmoBridge.abi,
+            functionName: 'getCosmosAddress',
+            args: [tba],
+          })
+          setCosmosAddr(cosAddr as string)
+        } catch { /* precompile not available */ }
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
         toast.error('Failed to load some dashboard data')
@@ -106,6 +118,11 @@ export default function ProfileDashboard() {
         <p className="text-surface-500 text-sm mt-1">
           Profile #{tokenId.toString()} · <span className="font-mono">{tba ? truncate(tba) : '...'}</span>
         </p>
+        {cosmosAddr && (
+          <p className="text-surface-400 text-xs mt-1 font-mono">
+            Cosmos: {cosmosAddr}
+          </p>
+        )}
       </div>
 
       {/* Stats row */}
@@ -144,7 +161,9 @@ export default function ProfileDashboard() {
                 toast.success('Starter tokens sent! Refreshing…')
                 setTimeout(() => window.location.reload(), 2000)
               } catch (err: any) {
-                toast.error(err?.message || 'Failed to claim tokens')
+                const msg = err?.message || 'Failed to claim tokens'
+                // Show a user-friendly message, not the raw viem error
+                toast.error(msg.length > 80 ? 'Failed to claim tokens — please try again' : msg)
               } finally {
                 setIsClaiming(false)
               }
@@ -234,6 +253,7 @@ export default function ProfileDashboard() {
         <NavButton to="/dungeon" label="Dungeon Drops" />
         <NavButton to="/harvest" label="Harvest Field" />
         <NavButton to="/dex" label="DEX" />
+        <NavButton to="/bridge" label="IBC Bridge" />
         <NavButton to="/marketplace" label="Marketplace" />
         <NavButton to="/gas" label="Gas Settings" />
         <NavButton to="/games" label="Game Hub" />

@@ -28,6 +28,9 @@ export default function BarterMarket() {
   const contracts = useContracts()
   const { execute, isPending } = useTBA()
 
+  // BarterMarket contract is not deployed — show a friendly message
+  const isBarterAvailable = contracts.barterMarket.address !== '0x0000000000000000000000000000000000000000'
+
   const [tab, setTab] = useState<'browse' | 'create'>('browse')
   const [isLoading, setIsLoading] = useState(true)
   const [offers, setOffers] = useState<BarterOffer[]>([])
@@ -71,7 +74,7 @@ export default function BarterMarket() {
   }, [pools, ratings, contracts])
 
   const fetchData = useCallback(async () => {
-    if (!tba) return
+    if (!tba || !isBarterAvailable) { setIsLoading(false); return }
     setIsLoading(true)
     try {
       // Fetch pools, ratings, inventory, and offers in parallel

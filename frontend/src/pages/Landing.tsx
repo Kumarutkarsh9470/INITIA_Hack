@@ -13,16 +13,16 @@ const FEATURES = [
     desc: 'Items and tokens earned in any game live in your TBA. Trade freely on the shared marketplace.',
   },
   {
-    title: 'Game Developer SDK',
-    desc: 'Register your game, get ERC-20 tokens and ERC-1155 items deployed automatically. Read/write state with simple calls.',
+    title: 'IBC Token Bridge',
+    desc: 'Bridge PXL, DNGN, HRV tokens to Initia L1 via IBC. Tokens are registered with the Cosmos bank module through ERC20Registry.',
   },
   {
     title: 'Gas Abstraction',
     desc: 'Pay gas with any game token — the Paymaster auto-swaps behind the scenes via the DEX.',
   },
   {
-    title: 'P2P Marketplace',
-    desc: 'List and buy ERC-1155 game items across games. 2.5% fee supports the ecosystem.',
+    title: 'Cosmos Identity',
+    desc: 'Each player wallet has a Cosmos (init1...) address alongside EVM. View your cross-chain identity on the dashboard.',
   },
   {
     title: 'On-Chain Achievements',
@@ -35,6 +35,7 @@ const ARCH_STEPS = [
   'TBA Wallet',
   'Game Tokens',
   'DEX',
+  'IBC Bridge',
   'Marketplace',
 ]
 
@@ -131,7 +132,7 @@ export default function Landing() {
       <section className="max-w-5xl mx-auto px-6 pb-24">
         <h2 className="text-2xl font-bold text-center text-surface-900 mb-2">Protocol Features</h2>
         <p className="text-center text-surface-500 mb-10 text-sm">
-          ERC-721 identity + ERC-6551 TBA + ERC-1155 items + AMM DEX
+          ERC-721 identity + ERC-6551 TBA + ERC-1155 items + AMM DEX + IBC Bridge + Cosmos Bank
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((f, i) => (

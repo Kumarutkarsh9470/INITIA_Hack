@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createWalletClient, createPublicClient, http, parseEther } from 'viem'
+import { createWalletClient, createPublicClient, http, parseEther, getAddress } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -7,9 +7,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'POST only' })
   }
 
-  const address = req.body?.address as string | undefined
-  if (!address || !address.startsWith('0x') || address.length !== 42) {
+  const rawAddress = req.body?.address as string | undefined
+  if (!rawAddress || !rawAddress.startsWith('0x') || rawAddress.trim().length !== 42) {
     return res.status(400).json({ error: 'Send { "address": "0x..." }' })
+  }
+  let address: `0x${string}`
+  try {
+    address = getAddress(rawAddress.trim())
+  } catch {
+    return res.status(400).json({ error: 'Invalid address checksum' })
   }
 
   const pk = process.env.PRIVATE_KEY

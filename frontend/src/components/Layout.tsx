@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/profile', label: 'Dashboard' },
   { to: '/games', label: 'Games' },
   { to: '/dex', label: 'DEX' },
+  { to: '/bridge', label: 'Bridge' },
   { to: '/marketplace', label: 'Market' },
   { to: '/gas', label: 'Gas' },
   { to: '/sdk', label: 'SDK' },

@@ -45,8 +45,16 @@ function faucetPlugin(): Plugin {
         }
 
         try {
-          const { createWalletClient, createPublicClient, http, parseEther } = await import('viem')
+          const { createWalletClient, createPublicClient, http, parseEther, getAddress: toChecksumAddress } = await import('viem')
           const { privateKeyToAccount } = await import('viem/accounts')
+
+          // Normalize address to EIP-55 checksum
+          let normalizedAddress: `0x${string}`
+          try { normalizedAddress = toChecksumAddress(address.trim()) } catch {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Invalid address checksum' }))
+            return
+          }
 
           const pk = process.env.VITE_DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY
           if (!pk) {
@@ -63,9 +71,8 @@ function faucetPlugin(): Plugin {
           const chain = { id: chainId, name: 'minievm', nativeCurrency: { name: 'GAS', symbol: 'GAS', decimals: 18 }, rpcUrls: { default: { http: [rpcUrl] } } }
           const client = createWalletClient({ account, transport })
 
-          // Send 0.1 GAS — enough for several transactions
           const hash = await client.sendTransaction({
-            to: address as `0x${string}`,
+            to: normalizedAddress,
             value: parseEther('0.1'),
             chain,
             account,
@@ -105,8 +112,16 @@ function faucetPlugin(): Plugin {
 
         try {
           // Lazy-import viem (available in node_modules)
-          const { createWalletClient, createPublicClient, http, parseEther, encodeFunctionData } = await import('viem')
+          const { createWalletClient, createPublicClient, http, parseEther, encodeFunctionData, getAddress } = await import('viem')
           const { privateKeyToAccount } = await import('viem/accounts')
+
+          // Normalize TBA address to EIP-55 checksum
+          let normalizedTba: `0x${string}`
+          try { normalizedTba = getAddress(tba.trim()) } catch {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Invalid TBA address checksum' }))
+            return
+          }
 
           const pk = process.env.VITE_DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY
           if (!pk) {
@@ -119,11 +134,11 @@ function faucetPlugin(): Plugin {
           const transport = http(rpcUrl)
           const account = privateKeyToAccount(pk as `0x${string}`)
 
-          // Deployed addresses
+          // Deployed addresses (normalized to EIP-55 checksum)
           const addresses = (await import('../deployed-addresses.json', { assert: { type: 'json' } })).default
-          const pxl = addresses.PXLToken as `0x${string}`
-          const dngn = addresses.DungeonDropsToken as `0x${string}`
-          const hrv = addresses.HarvestFieldToken as `0x${string}`
+          const pxl = getAddress(addresses.PXLToken)
+          const dngn = getAddress(addresses.DungeonDropsToken)
+          const hrv = getAddress(addresses.HarvestFieldToken)
 
           // Minimal ERC-20 transfer ABI
           const abi = [{ name: 'transfer', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }] as const
@@ -138,7 +153,7 @@ function faucetPlugin(): Plugin {
           let nonce = await pub.getTransactionCount({ address: account.address })
 
           const send = async (token: `0x${string}`, amount: bigint) => {
-            const data = encodeFunctionData({ abi, functionName: 'transfer', args: [tba as `0x${string}`, amount] })
+            const data = encodeFunctionData({ abi, functionName: 'transfer', args: [normalizedTba, amount] })
             const hash = await client.sendTransaction({ to: token, data, chain, account, nonce })
             nonce++
             // Wait for receipt to confirm before next tx

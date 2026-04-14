@@ -16,6 +16,7 @@ const Marketplace = lazy(() => import('./pages/Marketplace'))
 const GasSettings = lazy(() => import('./pages/GasSettings'))
 const GameHub = lazy(() => import('./pages/GameHub'))
 const SDKDocs = lazy(() => import('./pages/SDKDocs'))
+const Bridge = lazy(() => import('./pages/Bridge'))
 
 function PageLoader() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/dungeon" element={<ProtectedPage><DungeonDrops /></ProtectedPage>} />
         <Route path="/harvest" element={<ProtectedPage><HarvestField /></ProtectedPage>} />
         <Route path="/dex" element={<ProtectedPage><DEX /></ProtectedPage>} />
+        <Route path="/bridge" element={<ProtectedPage><Bridge /></ProtectedPage>} />
         <Route path="/marketplace" element={<ProtectedPage><Marketplace /></ProtectedPage>} />
         <Route path="/gas" element={<ProtectedPage><GasSettings /></ProtectedPage>} />
         <Route path="/games" element={<ProtectedPage><GameHub /></ProtectedPage>} />

@@ -45,26 +45,40 @@ extract_url() {
   grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' "$1" 2>/dev/null | head -1
 }
 
-# Test if a tunnel URL is responsive
+# Test if a tunnel is still alive (process-based, not URL-based)
+# URL-based testing fails on this machine due to WSL DNS issues
 test_tunnel() {
   local url="$1"
   local type="$2"  # evm, rpc, rest
 
   [[ -z "$url" ]] && return 1
 
+  # Primary check: is the cloudflared process for this port alive?
+  local port=""
+  case "$type" in
+    evm)  port=8545 ;;
+    rpc)  port=26657 ;;
+    rest) port=1317 ;;
+  esac
+
+  if ! pgrep -f "cloudflared.*localhost:${port}" >/dev/null 2>&1; then
+    return 1  # Process dead
+  fi
+
+  # Secondary: verify local service is responding
   if [[ "$type" == "evm" ]]; then
     local resp
-    resp=$(curl -sS --max-time 8 "$url" \
+    resp=$(curl -sS --max-time 5 "http://localhost:${port}" \
       -X POST -H "Content-Type: application/json" \
       -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' 2>/dev/null)
     echo "$resp" | grep -q '"result"' && return 0
   elif [[ "$type" == "rpc" ]]; then
     local resp
-    resp=$(curl -sS --max-time 8 "$url/status" 2>/dev/null)
+    resp=$(curl -sS --max-time 5 "http://localhost:${port}/status" 2>/dev/null)
     echo "$resp" | grep -q 'node_info' && return 0
   elif [[ "$type" == "rest" ]]; then
     local resp
-    resp=$(curl -sS --max-time 8 "$url/cosmos/base/tendermint/v1beta1/node_info" 2>/dev/null)
+    resp=$(curl -sS --max-time 5 "http://localhost:${port}/cosmos/base/tendermint/v1beta1/node_info" 2>/dev/null)
     echo "$resp" | grep -q 'node_info' && return 0
   fi
   return 1

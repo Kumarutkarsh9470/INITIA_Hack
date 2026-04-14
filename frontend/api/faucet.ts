@@ -5,13 +5,19 @@ import {
   http,
   parseEther,
   encodeFunctionData,
+  getAddress,
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-// Contract addresses (set via Vercel env vars)
-const PXL_TOKEN = process.env.PXL_TOKEN_ADDRESS as `0x${string}`
-const DNGN_TOKEN = process.env.DNGN_TOKEN_ADDRESS as `0x${string}`
-const HRV_TOKEN = process.env.HRV_TOKEN_ADDRESS as `0x${string}`
+// Normalize env-var addresses to EIP-55 checksum (handles wrong case / trailing whitespace)
+function safeAddr(raw: string | undefined): `0x${string}` | null {
+  if (!raw) return null
+  try { return getAddress(raw.trim()) } catch { return null }
+}
+
+const PXL_TOKEN = safeAddr(process.env.PXL_TOKEN_ADDRESS)
+const DNGN_TOKEN = safeAddr(process.env.DNGN_TOKEN_ADDRESS)
+const HRV_TOKEN = safeAddr(process.env.HRV_TOKEN_ADDRESS)
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -31,9 +37,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'POST only' })
   }
 
-  const tba = req.body?.tba as string | undefined
-  if (!tba || !tba.startsWith('0x') || tba.length !== 42) {
+  const rawTba = req.body?.tba as string | undefined
+  if (!rawTba || !rawTba.startsWith('0x') || rawTba.trim().length !== 42) {
     return res.status(400).json({ error: 'Send { "tba": "0x..." }' })
+  }
+  let tba: `0x${string}`
+  try {
+    tba = getAddress(rawTba.trim())
+  } catch {
+    return res.status(400).json({ error: 'Invalid TBA address checksum' })
   }
 
   const pk = process.env.PRIVATE_KEY
