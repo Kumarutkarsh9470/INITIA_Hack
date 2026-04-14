@@ -45,11 +45,11 @@ echo ""
 echo "⏳ Starting tunnels..."
 rm -f /tmp/cf-evm.log /tmp/cf-cosmos-rpc.log /tmp/cf-cosmos-rest.log
 
-cloudflared tunnel --url http://localhost:8545 > /tmp/cf-evm.log 2>&1 &
+cloudflared tunnel --url http://127.0.0.1:8545 > /tmp/cf-evm.log 2>&1 &
 EVM_PID=$!
-cloudflared tunnel --url http://localhost:26657 > /tmp/cf-cosmos-rpc.log 2>&1 &
+cloudflared tunnel --url http://127.0.0.1:26657 > /tmp/cf-cosmos-rpc.log 2>&1 &
 RPC_PID=$!
-cloudflared tunnel --url http://localhost:1317 > /tmp/cf-cosmos-rest.log 2>&1 &
+cloudflared tunnel --url http://127.0.0.1:1317 > /tmp/cf-cosmos-rest.log 2>&1 &
 REST_PID=$!
 
 # Wait for all 3 tunnel URLs (up to 45s)
