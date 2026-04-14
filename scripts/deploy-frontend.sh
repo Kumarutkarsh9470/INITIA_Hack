@@ -102,16 +102,23 @@ for attempt in $(seq 1 8); do
 done
 echo "✓ EVM tunnel verified"
 
+echo "⏳ Verifying Cosmos REST tunnel..."
 for attempt in $(seq 1 20); do
-  REST_TEST=$(curl -sS -m 10 "$COSMOS_REST_URL/cosmos/base/tendermint/v1beta1/node_info" 2>&1 | head -c 100 || true)
-  if echo "$REST_TEST" | grep -q "node_info"; then
+  REST_TEST=$(curl -sS -m 15 \
+    "$COSMOS_REST_URL/cosmos/base/tendermint/v1beta1/node_info" || true)
+
+  if echo "$REST_TEST" | grep -q "default_node_info"; then
+    echo "✓ Cosmos REST tunnel verified"
     break
   fi
-  if [[ $attempt -eq 8 ]]; then
-    echo "✗ Cosmos REST tunnel not responding after 8 attempts"
+
+  if [[ $attempt -eq 20 ]]; then
+    echo "✗ Cosmos REST tunnel not responding after 20 attempts"
+    echo "Last response: $REST_TEST"
     exit 1
   fi
-  echo "  Cosmos REST tunnel not ready yet (attempt $attempt/8)..."
+
+  echo "  Cosmos REST tunnel not ready yet (attempt $attempt/20)..."
   sleep 5
 done
 echo "✓ Cosmos REST tunnel verified"
