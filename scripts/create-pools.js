@@ -1,11 +1,14 @@
+require("dotenv").config();
 const { ethers } = require("ethers");
 const addr = require("../deployed-addresses.json");
 
-const p = new ethers.JsonRpcProvider("http://localhost:8545");
-const w = new ethers.Wallet(
-  "0xc12c3a30e8e0c5a40107b3a862ada29c5fc00b869f62e96b08a4b70cee62bab9",
-  p
-);
+const rpcUrl = process.env.MINIEVM_RPC_URL || "http://localhost:8545";
+if (!process.env.PRIVATE_KEY) {
+  console.error("Error: PRIVATE_KEY not set in .env");
+  process.exit(1);
+}
+const p = new ethers.JsonRpcProvider(rpcUrl);
+const w = new ethers.Wallet(process.env.PRIVATE_KEY, p);
 
 const dexAbi = [
   "function createPool(bytes32,uint256,uint256)",

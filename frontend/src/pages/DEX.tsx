@@ -119,18 +119,24 @@ export default function DEX() {
 
   async function handleAddLiquidity() {
     if (!tba) return
-    const pxlAmt = safeParse(lpPxlAmount), gameAmt = safeParse(lpGameAmount)
-    if (pxlAmt === 0n || gameAmt === 0n) return toast.error('Enter amounts')
+    const pxlAmt = safeParse(lpPxlAmount)
+    if (pxlAmt === 0n) return toast.error('Enter PXL amount')
+    const { reservePXL, reserveGame } = pools[selectedGame]
+    if (reservePXL === 0n) return toast.error('Pool not initialized')
+    // Contract calculates: gameAmount = (pxlAmount * reserveGame) / reservePXL
+    const gameAmtNeeded = (pxlAmt * reserveGame) / reservePXL
+    // Add 0.5% slippage buffer for maxGameAmount
+    const maxGameAmt = gameAmtNeeded + (gameAmtNeeded * SLIPPAGE_BPS / 10000n)
     const gameId = GAME_IDS[selectedGame]
     const gameTokenContract = selectedGame === 'DNGN' ? contracts.dungeonDropsToken : contracts.harvestFieldToken
     try {
       await execute(contracts.pxlToken.address, 0n,
         encodeFunctionData({ abi: contracts.pxlToken.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, pxlAmt] }))
       await execute(gameTokenContract.address, 0n,
-        encodeFunctionData({ abi: gameTokenContract.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, gameAmt] }))
+        encodeFunctionData({ abi: gameTokenContract.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, maxGameAmt] }))
       await execute(contracts.pixelVaultDEX.address, 0n,
-        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: 'addLiquidity', args: [gameId, pxlAmt, gameAmt] }))
-      toast.success('Liquidity added!'); setLpPxlAmount(''); setLpGameAmount(''); await fetchAll()
+        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: 'addLiquidity', args: [gameId, pxlAmt, maxGameAmt] }))
+      toast.success('Liquidity added!'); setLpPxlAmount(''); await fetchAll()
     } catch (err: any) { toast.error(err?.message ?? 'Add liquidity failed') }
   }
 
@@ -259,7 +265,7 @@ export default function DEX() {
                 </div>
                 <div className="flex justify-between text-xs text-surface-400">
                   <span>Spot price</span>
-                  <span>1 PXL = {fmt(pool.price)} {selectedGame}</span>
+                  <span>1 {selectedGame} = {fmt(pool.price)} PXL</span>
                 </div>
               </>
             )}
@@ -292,8 +298,18 @@ export default function DEX() {
           <div className="card p-5 space-y-4">
             <h3 className="section-title text-sm">Add Liquidity</h3>
             <LpInput label="PXL Amount" value={lpPxlAmount} onChange={setLpPxlAmount} balance={pxlBalance} token="PXL" />
-            <LpInput label={`${selectedGame} Amount`} value={lpGameAmount} onChange={setLpGameAmount}
-              balance={selectedGame === 'DNGN' ? dngnBalance : hrvBalance} token={selectedGame} />
+            {(() => {
+              const pxlAmt = safeParse(lpPxlAmount)
+              const { reservePXL, reserveGame } = pools[selectedGame]
+              const gameNeeded = reservePXL > 0n ? (pxlAmt * reserveGame) / reservePXL : 0n
+              return pxlAmt > 0n && gameNeeded > 0n ? (
+                <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-sm">
+                  <span className="text-surface-500">{selectedGame} needed: </span>
+                  <span className="font-semibold">{fmt(gameNeeded)}</span>
+                  <span className="text-surface-400 text-xs ml-1">(auto-calculated from pool ratio)</span>
+                </div>
+              ) : null
+            })()}
             <button onClick={handleAddLiquidity} disabled={isPending}
               className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed">
               {isPending ? 'Processing…' : 'Add Liquidity'}

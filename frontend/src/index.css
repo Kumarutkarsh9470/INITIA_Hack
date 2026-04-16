@@ -95,3 +95,47 @@
     transform: translateY(0);
   }
 }
+
+/* Gradient text utility */
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Shimmer background for loading / decoration */
+.bg-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+}
+
+/* Dungeon theme */
+.dungeon-gradient {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+/* Harvest theme */
+.harvest-gradient {
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
+}
+
+/* Hero mesh gradient */
+.hero-mesh {
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(92, 124, 250, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+}
+
+/* Glow ring for cards */
+.glow-ring {
+  box-shadow: 0 0 0 1px rgba(92, 124, 250, 0.1), 0 0 20px rgba(92, 124, 250, 0.08);
+}
+
+/* Grid pattern background */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}

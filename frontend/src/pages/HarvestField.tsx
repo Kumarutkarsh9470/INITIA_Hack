@@ -188,15 +188,20 @@ export default function HarvestField() {
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">Harvest Field</h1>
-          <p className="text-surface-500 text-sm mt-0.5">Stake HRV for 100 blocks to earn rewards</p>
-          <p className="text-xs text-surface-400 mt-1 italic">Demo game — in production, this is a farming simulation with 3D fields. The staking/harvest contract calls are identical.</p>
-        </div>
-        <div className="card px-4 py-2 text-right">
-          <p className="stat-label">Balance</p>
-          <p className="text-sm font-bold text-surface-900">{fmt(hrvBalance)} HRV</p>
+      {/* Farming-themed header */}
+      <div className="harvest-gradient rounded-2xl p-6 text-white animate-fade-in-up">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🌾</span>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Harvest Field</h1>
+              <p className="text-white/60 text-sm">Stake HRV for 100 blocks to earn rewards</p>
+            </div>
+          </div>
+          <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2 text-right">
+            <p className="text-white/50 text-[10px] uppercase tracking-wider">Balance</p>
+            <p className="text-sm font-bold text-white">{fmt(hrvBalance)} HRV</p>
+          </div>
         </div>
       </div>
 
@@ -239,7 +244,6 @@ export default function HarvestField() {
             </div>
             <span className="text-xs font-mono text-emerald-500">×{harvestItemBalance.toString()}</span>
           </div>
-          <p className="text-[10px] text-surface-300 italic">In production, multiplier enforced on-chain via modifier checks.</p>
         </div>
       )}
 

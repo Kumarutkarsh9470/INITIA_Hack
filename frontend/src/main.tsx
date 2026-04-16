@@ -34,12 +34,12 @@ const cosmosRest = import.meta.env.VITE_COSMOS_REST_URL ?? `${origin}/cosmos-res
 
 // Define PixelVault MiniEVM as a viem/wagmi chain
 const pixelvaultChain = defineChain({
-  id: Number(import.meta.env.VITE_CHAIN_ID ?? 2891653883154692),
+  id: Number(import.meta.env.VITE_CHAIN_ID || 2891653883154692),
   name: 'PixelVault Appchain',
   nativeCurrency: {
-    name: import.meta.env.VITE_NATIVE_SYMBOL ?? 'GAS',
-    symbol: import.meta.env.VITE_NATIVE_SYMBOL ?? 'GAS',
-    decimals: Number(import.meta.env.VITE_NATIVE_DECIMALS ?? 18),
+    name: import.meta.env.VITE_NATIVE_SYMBOL || 'GAS',
+    symbol: import.meta.env.VITE_NATIVE_SYMBOL || 'GAS',
+    decimals: Number(import.meta.env.VITE_NATIVE_DECIMALS || 18),
   },
   rpcUrls: {
     default: {
@@ -54,7 +54,7 @@ const wagmiConfig = createConfig({
 })
 
 const customChain = {
-  chain_id: import.meta.env.VITE_APPCHAIN_ID,
+  chain_id: import.meta.env.VITE_APPCHAIN_ID || 'trying',
   chain_name: 'pixelvault',
   pretty_name: 'PixelVault Appchain',
   network_type: 'testnet',
@@ -72,7 +72,7 @@ const customChain = {
   fees: {
     fee_tokens: [
       {
-        denom: import.meta.env.VITE_NATIVE_DENOM,
+        denom: import.meta.env.VITE_NATIVE_DENOM || 'GAS',
         fixed_min_gas_price: 0,
         low_gas_price: 0,
         average_gas_price: 0,
@@ -81,7 +81,7 @@ const customChain = {
     ],
   },
   staking: {
-    staking_tokens: [{ denom: import.meta.env.VITE_NATIVE_DENOM }],
+    staking_tokens: [{ denom: import.meta.env.VITE_NATIVE_DENOM || 'GAS' }],
   },
   metadata: {
     minitia: { type: 'minievm' },
@@ -89,10 +89,10 @@ const customChain = {
   },
   native_assets: [
     {
-      denom: import.meta.env.VITE_NATIVE_DENOM,
+      denom: import.meta.env.VITE_NATIVE_DENOM || 'GAS',
       name: 'Native Token',
-      symbol: import.meta.env.VITE_NATIVE_SYMBOL,
-      decimals: Number(import.meta.env.VITE_NATIVE_DECIMALS ?? 18),
+      symbol: import.meta.env.VITE_NATIVE_SYMBOL || 'GAS',
+      decimals: Number(import.meta.env.VITE_NATIVE_DECIMALS || 18),
     },
   ],
 }

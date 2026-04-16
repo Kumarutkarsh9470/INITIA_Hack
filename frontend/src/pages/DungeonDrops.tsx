@@ -184,10 +184,15 @@ export default function DungeonDrops() {
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div>
-        <h1 className="page-title">Dungeon Drops</h1>
-        <p className="text-surface-500 text-sm mt-1">Pay 10 DNGN to enter and roll for loot</p>
-        <p className="text-xs text-surface-400 mt-1 italic">Demo game — in production, this logic runs inside a Unity/Unreal dungeon crawler. Same smart contract calls, visual gameplay on top.</p>
+      {/* Dungeon-themed header */}
+      <div className="dungeon-gradient rounded-2xl p-6 text-white animate-fade-in-up">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-3xl">⚔️</span>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dungeon Drops</h1>
+            <p className="text-white/60 text-sm">Pay 10 DNGN to enter and roll for loot</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats */}
@@ -257,7 +262,6 @@ export default function DungeonDrops() {
               )
             })}
           </div>
-          <p className="text-[10px] text-surface-300 italic">In production, bonuses are enforced on-chain via modifier checks.</p>
         </div>
       )}
 
@@ -294,17 +298,19 @@ export default function DungeonDrops() {
             style={{
               transition: 'opacity 500ms ease, transform 500ms ease',
               opacity: showLoot ? 1 : 0,
-              transform: showLoot ? 'translateY(0)' : 'translateY(12px)',
+              transform: showLoot ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.95)',
             }}
-            className={`rounded-xl border p-5 text-center ${lootRarity?.bg ?? 'bg-surface-50 border-surface-200'}`}
+            className={`rounded-xl border p-6 text-center ${lootRarity?.bg ?? 'bg-surface-50 border-surface-200'}`}
           >
-            <p className="text-surface-400 text-xs uppercase tracking-widest mb-1">Loot Drop</p>
-            <p className={`text-2xl font-bold ${lootRarity?.color ?? 'text-surface-900'}`}>
-              {lootName}
-            </p>
-            <p className={`text-xs mt-1 font-medium ${lootRarity?.color ?? 'text-surface-500'}`}>
-              {lootRarity?.label}
-            </p>
+            <div className={showLoot ? 'animate-chest-open' : ''}>
+              <p className="text-surface-400 text-xs uppercase tracking-widest mb-2">⚡ Loot Drop</p>
+              <p className={`text-3xl font-bold ${lootRarity?.color ?? 'text-surface-900'}`}>
+                {lootName}
+              </p>
+              <p className={`text-sm mt-1 font-medium ${lootRarity?.color ?? 'text-surface-500'}`}>
+                {lootRarity?.label}
+              </p>
+            </div>
           </div>
         )}
       </div>

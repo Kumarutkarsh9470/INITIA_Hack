@@ -6,7 +6,7 @@ import { publicClient, useContracts } from './useContracts'
 import { ADDRESSES } from '../lib/addresses'
 import { PlayerProfileABI } from '../lib/abis'
 
-const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID
+const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID || 'trying'
 
 // --- localStorage profile cache ---
 const CACHE_KEY = 'pv-profile-cache'

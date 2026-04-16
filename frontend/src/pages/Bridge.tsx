@@ -25,6 +25,8 @@ export default function Bridge() {
   const [cosmosAddr, setCosmosAddr] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
+  const [bridgeError, setBridgeError] = useState<string | null>(null)
+
   const tokenAddressMap: Record<BridgeToken, `0x${string}`> = {
     PXL: contracts.pxlToken.address,
     DNGN: contracts.dungeonDropsToken.address,
@@ -73,6 +75,7 @@ export default function Bridge() {
 
   const handleBridge = async () => {
     if (!tba || !hasSufficientBalance || !isValidReceiver) return
+    setBridgeError(null)
 
     try {
       // Step 1: Approve the CosmoBridge to spend tokens from TBA
@@ -96,7 +99,16 @@ export default function Bridge() {
       fetchData()
     } catch (err: any) {
       console.error('Bridge failed:', err)
-      toast.error(err?.message?.includes('user rejected') ? 'Transaction rejected' : 'Bridge failed — token may not be registered with Cosmos bank')
+      const msg = err?.message || ''
+      if (msg.includes('user rejected')) {
+        toast.error('Transaction rejected')
+      } else if (msg.includes('IBC') || msg.includes('channel') || msg.includes('relayer') || msg.includes('timeout')) {
+        setBridgeError('IBC relayer may not be active. The bridge transaction was submitted on-chain but the cross-chain relay may be delayed. Tokens are safe — if the transfer times out, they will be refunded automatically.')
+        toast.error('Bridge submitted — relay may be delayed')
+      } else {
+        setBridgeError('Bridge transaction failed. This may happen if the IBC relayer is not currently running or the token is not registered with the Cosmos bank module.')
+        toast.error('Bridge failed')
+      }
     }
   }
 
@@ -110,6 +122,19 @@ export default function Bridge() {
         <p className="text-surface-500 text-sm mt-1">
           Bridge tokens from MiniEVM to Initia L1 via IBC
         </p>
+      </div>
+
+      {/* IBC Status Notice */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up">
+        <span className="text-amber-500 text-lg mt-0.5">⚠️</span>
+        <div>
+          <p className="text-sm font-medium text-amber-800">IBC Relayer Status</p>
+          <p className="text-xs text-amber-600 mt-0.5">
+            Cross-chain transfers require an active IBC relayer between MiniEVM and Initia L1.
+            If the relayer is temporarily offline, bridge transactions are submitted on-chain but
+            relay will happen once it comes back online. Tokens are never lost — timed-out transfers are refunded.
+          </p>
+        </div>
       </div>
 
       {/* Cosmos Identity Card */}
@@ -201,6 +226,14 @@ export default function Bridge() {
               <span className="text-surface-500">Timeout</span>
               <span className="text-surface-700">10 minutes</span>
             </div>
+          </div>
+        )}
+
+        {/* Bridge error */}
+        {bridgeError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
+            <p className="font-medium mb-1">Bridge Issue</p>
+            <p className="text-xs text-red-600">{bridgeError}</p>
           </div>
         )}
 

@@ -50,8 +50,6 @@ React 18 + TypeScript + Vite + Tailwind CSS. Uses **InterwovenKit** for wallet c
 ### Prerequisites
 
 - Node.js ≥ 18
-- A running Initia MiniEVM node (local or testnet)
-- Deployer private key with gas tokens
 
 ### 1. Install dependencies
 
@@ -60,51 +58,139 @@ npm install
 cd frontend && npm install && cd ..
 ```
 
-### 2. Configure environment
+---
 
-Create a `.env` in the project root:
+## For Contributors — Frontend Development
 
-```
-MINIEVM_RPC_URL=http://localhost:8545
-PRIVATE_KEY=0x<deployer_private_key>
-CHAIN_ID=<your_chain_id>
-```
+> **You do NOT need your own blockchain node.** The Vite dev server automatically proxies
+> API calls to the production chain running on our Contabo VPS.
 
-Create `frontend/.env`:
-
-```
-VITE_APPCHAIN_ID=<chain_id_string>
-VITE_DEPLOYER_PRIVATE_KEY=0x<deployer_private_key>
-```
-
-### 3. Deploy contracts
+### Setup (3 commands)
 
 ```bash
-npx hardhat run scripts/deploy.ts --network minievm
-```
-
-### 4. Wire contracts (roles, items, DEX pools)
-
-```bash
-npx hardhat run scripts/wire.ts --network minievm
-```
-
-### 5. Seed marketplace (optional)
-
-```bash
-npx hardhat run scripts/seed-marketplace.ts --network minievm
-```
-
-This creates 5 pre-populated listings so the marketplace isn't empty during judging.
-
-### 6. Start frontend
-
-```bash
-cd frontend
+git clone https://github.com/Kumarutkarsh9470/INITIA_Hack.git
+cd INITIA_Hack/frontend
+npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+That's it. Open `http://localhost:5173` in your browser.
+
+### What happens under the hood
+
+- The Vite dev server proxies `/evm-rpc`, `/cosmos-rpc`, `/cosmos-rest` to the production server at `207.180.203.32`
+- `/api/faucet` and `/api/fund-gas` are proxied to the production Vercel deployment automatically (no PRIVATE_KEY needed locally)
+- Contract addresses are bundled from `deployed-addresses.json` (already in the repo)
+- No `.env` file needed — defaults work out of the box
+
+### Getting test tokens
+
+1. Connect your wallet (InterwovenKit / Initia Wallet)
+2. Create a profile — starter tokens (10,000 PXL + 500 DNGN + 500 HRV) are sent automatically on profile mint
+
+### Frontend tech stack
+
+- React 18 + TypeScript
+- Vite 5 + Tailwind CSS
+- wagmi 2 + viem 2
+- @initia/interwovenkit-react
+- react-router-dom
+
+### Key files
+
+```
+frontend/
+  src/
+    main.tsx              # App entry, InterwovenKit providers, chain config
+    App.tsx               # Router
+    pages/                # All page components
+    hooks/
+      useContracts.ts     # viem publicClient for contract reads
+      useWallet.tsx       # InterwovenKit wallet hook (sendTx)
+    lib/
+      addresses.ts        # Reads deployed-addresses.json
+      abis/               # Contract ABIs (JSON)
+    components/
+      Layout.tsx          # Navbar + page layout
+      ErrorBoundary.tsx   # Crash boundary
+  deployed-addresses.json # Production contract addresses (auto-imported)
+  vite.config.ts          # Dev proxy → production server
+```
+
+---
+
+## For Contributors — Smart Contract Development
+
+> **Only needed if you're modifying Solidity contracts.** Frontend-only contributors can skip this section.
+
+### Running tests locally (no chain needed)
+
+```bash
+# From the project root
+npm install
+npx hardhat test
+```
+
+All tests run against Hardhat's in-memory EVM — no external chain required.
+
+### Deploying to a local Hardhat node
+
+```bash
+# Terminal 1: Start local node
+npx hardhat node
+
+# Terminal 2: Deploy + wire
+npx hardhat run scripts/deploy.ts --network localhost
+npx hardhat run scripts/wire.ts --network localhost
+```
+
+### Deploying to the production chain
+
+> ⚠️ **Only do this if you need to redeploy contracts.** This overwrites production.
+
+1. Get the deployer private key from the team lead
+2. Create a `.env` file in the project root (see `.env.example`):
+   ```
+   PRIVATE_KEY=0x_YOUR_KEY_HERE
+   MINIEVM_RPC_URL=http://207.180.203.32/evm-rpc
+   CHAIN_ID=2891653883154692
+   ```
+3. Deploy:
+   ```bash
+   npx hardhat run scripts/deploy.ts --network minievm
+   npx hardhat run scripts/wire.ts --network minievm
+   ```
+4. Copy addresses to frontend:
+   ```bash
+   cp deployed-addresses.json frontend/src/lib/deployed-addresses.json
+   ```
+
+### Contract tech stack
+
+- Solidity 0.8.25 (viaIR enabled, Cancun EVM target)
+- Hardhat 2.28.6
+- OpenZeppelin Contracts 5.x
+
+---
+
+## Production Deployment
+
+The production instance runs on a Contabo VPS at `207.180.203.32`:
+
+| Service | Port | Description |
+|---------|------|-------------|
+| nginx | 80 | Reverse proxy (rate-limited) |
+| minitiad (EVM RPC) | 8545 | MiniEVM JSON-RPC |
+| minitiad (Cosmos RPC) | 26657 | Tendermint RPC |
+| minitiad (REST) | 1317 | Cosmos LCD/REST API |
+
+Nginx routes:
+- `/health` → health check
+- `/evm-rpc` → EVM JSON-RPC
+- `/cosmos-rpc` → Cosmos RPC
+- `/cosmos-rest` → Cosmos REST
+
+Frontend is hosted on Vercel at https://pixelvault-two.vercel.app with serverless functions proxying API calls to the VPS.
 
 ## How It Works (User Flow)
 

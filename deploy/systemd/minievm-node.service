@@ -1,0 +1,32 @@
+[Unit]
+Description=PixelVault Initia MiniEVM Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pixelvault
+Group=pixelvault
+Environment="HOME=/home/pixelvault"
+WorkingDirectory=/home/pixelvault
+
+# weave rollup start runs the node
+ExecStart=/usr/local/bin/weave rollup start
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=minievm-node
+
+# Resource limits
+LimitNOFILE=65535
+LimitNPROC=65535
+
+# Give the node time to sync on startup
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

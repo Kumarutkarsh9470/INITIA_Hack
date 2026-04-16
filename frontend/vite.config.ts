@@ -23,6 +23,33 @@ function faucetPlugin(): Plugin {
     name: 'faucet-api',
     configureServer(server) {
 
+      // If no PRIVATE_KEY, proxy /api/* to production Vercel (for contributors)
+      const pk = process.env.VITE_DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY
+      if (!pk) {
+        const VERCEL_URL = process.env.VERCEL_URL || 'https://pixelvault-two.vercel.app'
+        console.log(`[faucet] No PRIVATE_KEY found — proxying /api/* to ${VERCEL_URL}`)
+        for (const route of ['/api/fund-gas', '/api/faucet']) {
+          server.middlewares.use(route, async (req, res) => {
+            try {
+              const chunks: Buffer[] = []
+              for await (const chunk of req) chunks.push(chunk as Buffer)
+              const upstream = await fetch(`${VERCEL_URL}${route}`, {
+                method: req.method || 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: Buffer.concat(chunks).toString(),
+              })
+              const data = await upstream.text()
+              res.writeHead(upstream.status, { 'Content-Type': 'application/json' })
+              res.end(data)
+            } catch (err: any) {
+              res.writeHead(502, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'Proxy to production failed: ' + err?.message }))
+            }
+          })
+        }
+        return
+      }
+
       // ── /api/fund-gas — send native GAS to a new EVM address ──
       server.middlewares.use('/api/fund-gas', async (req, res) => {
         if (req.method !== 'POST') {
@@ -177,23 +204,23 @@ function faucetPlugin(): Plugin {
   }
 }
 
+// Production VPS — used as dev proxy target so contributors don't need a local node
+const VPS_ORIGIN = process.env.VPS_ORIGIN || 'http://207.180.203.32'
+
 export default defineConfig({
   server: {
     proxy: {
       '/evm-rpc': {
-        target: 'http://localhost:8545',
+        target: VPS_ORIGIN,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/evm-rpc/, ''),
       },
       '/cosmos-rpc': {
-        target: 'http://localhost:26657',
+        target: VPS_ORIGIN,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/cosmos-rpc/, ''),
       },
       '/cosmos-rest': {
-        target: 'http://localhost:1317',
+        target: VPS_ORIGIN,
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/cosmos-rest/, ''),
       },
     },
   },

@@ -5,7 +5,7 @@ import { ERC6551AccountABI, GasPaymasterABI } from '../lib/abis'
 import { ADDRESSES } from '../lib/addresses'
 import { usePlayerProfile } from './usePlayerProfile'
 
-const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID
+const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID || 'trying'
 
 interface TBAActions {
   execute: (target: `0x${string}`, value: bigint, calldata: `0x${string}`) => Promise<any>

@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { useInterwovenKit } from '@initia/interwovenkit-react'
 
-const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID
+const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID || 'trying'
 
 /**
  * Auto-sign hook using InterwovenKit's real autoSign API.
