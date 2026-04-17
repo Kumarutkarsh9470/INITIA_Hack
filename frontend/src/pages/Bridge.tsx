@@ -1,9 +1,21 @@
 import { useState, useEffect, useCallback } from 'react'
-import { formatEther, parseEther, encodeFunctionData } from 'viem'
+import { formatEther, parseEther, encodeFunctionData, parseAbi } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
+import { useInterwovenKit } from '@initia/interwovenkit-react'
+import { AccAddress } from '@initia/initia.js'
+import { ERC6551AccountABI } from '../lib/abis'
 import toast from 'react-hot-toast'
+
+const CHAIN_ID = import.meta.env.VITE_APPCHAIN_ID || 'trying'
+const ICOSMOS_ADDRESS = '0x00000000000000000000000000000000000000F1' as const
+
+const ICosmosABI = parseAbi([
+  'function execute_cosmos(string msg, uint64 gas_limit) external returns (bool)',
+  'function to_denom(address erc20_address) external view returns (string)',
+  'function to_cosmos_address(address evm_address) external view returns (string)',
+])
 
 type BridgeToken = 'PXL' | 'DNGN' | 'HRV'
 
@@ -16,6 +28,7 @@ const TOKEN_INFO: Record<BridgeToken, { label: string; desc: string }> = {
 export default function Bridge() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
+  const { initiaAddress, requestTxBlock } = useInterwovenKit()
   const { execute, isPending } = useTBA()
 
   const [selectedToken, setSelectedToken] = useState<BridgeToken>('PXL')
@@ -51,12 +64,12 @@ export default function Bridge() {
       ])
       setBalances({ PXL: pxl as bigint, DNGN: dngn as bigint, HRV: hrv as bigint })
 
-      // Get Cosmos address for TBA
+      // Get Cosmos address for the user's EOA (tokens bridge from here)
       try {
         const addr = await publicClient.readContract({
-          address: contracts.cosmoBridge.address,
-          abi: contracts.cosmoBridge.abi,
-          functionName: 'getCosmosAddress',
+          address: ICOSMOS_ADDRESS,
+          abi: ICosmosABI,
+          functionName: 'to_cosmos_address',
           args: [tba],
         })
         setCosmosAddr(addr as string)
@@ -80,25 +93,86 @@ export default function Bridge() {
   const isValidReceiver = receiver.startsWith('init1') && receiver.length >= 40
 
   const handleBridge = async () => {
-    if (!tba || !hasSufficientBalance || !isValidReceiver) return
+    if (!tba || !hasSufficientBalance || !isValidReceiver || !initiaAddress) return
     setBridgeError(null)
 
     try {
-      // Step 1: Approve the CosmoBridge to spend tokens from TBA
-      const approveData = encodeFunctionData({
-        abi: tokenAbiMap[selectedToken],
-        functionName: 'approve',
-        args: [contracts.cosmoBridge.address, parsedAmount],
-      })
-      await execute(tokenAddressMap[selectedToken], 0n, approveData)
+      // Get user's EVM address from their Cosmos address
+      const userEVMAddr = AccAddress.toHex(initiaAddress) as `0x${string}`
 
-      // Step 2: Call bridgeTokenToL1
-      const bridgeData = encodeFunctionData({
-        abi: contracts.cosmoBridge.abi,
-        functionName: 'bridgeTokenToL1',
-        args: [tokenAddressMap[selectedToken], parsedAmount, receiver],
+      // Read the token's Cosmos denom from the ICosmos precompile
+      const denom = await publicClient.readContract({
+        address: ICOSMOS_ADDRESS,
+        abi: ICosmosABI,
+        functionName: 'to_denom',
+        args: [tokenAddressMap[selectedToken]],
+      }) as string
+
+      // === Message 1: TBA transfers tokens to user's EOA ===
+      const transferCalldata = encodeFunctionData({
+        abi: tokenAbiMap[selectedToken],
+        functionName: 'transfer',
+        args: [userEVMAddr, parsedAmount],
       })
-      await execute(contracts.cosmoBridge.address, 0n, bridgeData)
+      const tbaTransferCalldata = encodeFunctionData({
+        abi: ERC6551AccountABI,
+        functionName: 'execute',
+        args: [tokenAddressMap[selectedToken], 0n, transferCalldata, 0],
+      })
+
+      // === Message 2: User's EOA calls execute_cosmos for IBC transfer ===
+      // execute_cosmos only works from EOAs (not contracts), so we call it
+      // directly from the user's address instead of going through CosmoBridge
+      const timeoutTimestamp = BigInt(Math.floor(Date.now() / 1000) + 600) * 1000000000n
+      const ibcMsg = JSON.stringify({
+        '@type': '/ibc.applications.transfer.v1.MsgTransfer',
+        source_port: 'transfer',
+        source_channel: 'channel-0',
+        token: { denom, amount: parsedAmount.toString() },
+        sender: initiaAddress.toLowerCase(),
+        receiver,
+        timeout_height: { revision_number: '0', revision_height: '0' },
+        timeout_timestamp: timeoutTimestamp.toString(),
+        memo: '',
+      })
+
+      const executeCosmosCalldata = encodeFunctionData({
+        abi: ICosmosABI,
+        functionName: 'execute_cosmos',
+        args: [ibcMsg, 300000n],
+      })
+
+      // Send both messages in one atomic Cosmos tx:
+      // 1. TBA → transfer tokens to user's EOA
+      // 2. User's EOA → execute_cosmos (IBC bridge)
+      // If msg 2 fails, msg 1 is rolled back (Cosmos SDK atomicity)
+      await requestTxBlock({
+        chainId: CHAIN_ID,
+        messages: [
+          {
+            typeUrl: '/minievm.evm.v1.MsgCall',
+            value: {
+              sender: initiaAddress.toLowerCase(),
+              contractAddr: tba,
+              input: tbaTransferCalldata,
+              value: '0',
+              accessList: [],
+              authList: [],
+            },
+          },
+          {
+            typeUrl: '/minievm.evm.v1.MsgCall',
+            value: {
+              sender: initiaAddress.toLowerCase(),
+              contractAddr: ICOSMOS_ADDRESS,
+              input: executeCosmosCalldata,
+              value: '0',
+              accessList: [],
+              authList: [],
+            },
+          },
+        ],
+      })
 
       toast.success(`Bridged ${amount} ${selectedToken} to L1!`)
       setAmount('')

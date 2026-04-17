@@ -14,9 +14,7 @@ import "./initia/InitiaERC20.sol";
 contract GameTokenInitia is InitiaERC20 {
     uint256 public constant MAX_SUPPLY = 1_000_000_000 * 1e18;
     bytes32 public immutable gameId;
-
     event TokensMinted(address indexed to, uint256 amount);
-
     constructor(
         string memory _name,
         string memory _symbol,
@@ -31,7 +29,6 @@ contract GameTokenInitia is InitiaERC20 {
             emit TokensMinted(developer, initialSupply);
         }
     }
-
     /// @dev Override mint to enforce MAX_SUPPLY cap
     function mint(address to, uint256 amount) external override mintable(to) onlyOwner {
         require(totalSupply + amount <= MAX_SUPPLY, "Cap exceeded");

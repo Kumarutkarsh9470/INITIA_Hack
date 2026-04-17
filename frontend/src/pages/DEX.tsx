@@ -6,13 +6,10 @@ import { useTBA } from '../hooks/useTBA'
 import { GAME_IDS, DUNGEON_ITEMS, DUNGEON_EXPECTED_COST, DUNGEON_DROP_RATES } from '../lib/constants'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-
 type GameToken = 'DNGN' | 'HRV'
 type SwapDirection = 'pxlToGame' | 'gameToPxl'
 type Tab = 'swap' | 'liquidity' | 'economics'
-
 interface PoolInfo { reservePXL: bigint; reserveGame: bigint; price: bigint }
-
 function fmt(val: bigint, decimals = 4): string {
   return parseFloat(formatEther(val)).toFixed(decimals)
 }
