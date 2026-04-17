@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./initia/ICosmos.sol";
+import "./initia/IERC20Registry.sol";
 
 /**
  * @title CosmoBridge
@@ -25,6 +26,11 @@ contract CosmoBridge is ReentrancyGuard {
 
     // Timeout: 10 minutes from current block timestamp (in nanoseconds)
     uint64 public constant TIMEOUT_OFFSET_NS = 10 * 60 * 1_000_000_000;
+
+    constructor() {
+        // Register ERC20 store so this contract can hold cosmos-bank-mirrored tokens
+        ERC20_REGISTRY_CONTRACT.register_erc20_store(address(this));
+    }
 
     event TokenBridged(
         address indexed sender,
@@ -56,12 +62,16 @@ contract CosmoBridge is ReentrancyGuard {
         require(amount > 0, "Amount must be > 0");
         require(bytes(receiver).length > 0, "Invalid receiver");
 
+        // Transfer tokens from caller to this contract (caller must have approved)
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+
         // Get the Cosmos denom for this ERC20
         string memory denom = COSMOS_CONTRACT.to_denom(token);
         require(bytes(denom).length > 0, "Token not registered with Cosmos bank");
 
-        // Get sender's Cosmos address
-        string memory senderCosmos = COSMOS_CONTRACT.to_cosmos_address(msg.sender);
+        // Use this contract's Cosmos address as sender (it now holds the tokens,
+        // and execute_cosmos requires sender == caller's cosmos address)
+        string memory senderCosmos = COSMOS_CONTRACT.to_cosmos_address(address(this));
 
         // Calculate timeout timestamp (nanoseconds)
         uint64 timeoutTimestamp = uint64(block.timestamp) * 1_000_000_000 + TIMEOUT_OFFSET_NS;
