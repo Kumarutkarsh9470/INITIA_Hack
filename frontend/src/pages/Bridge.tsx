@@ -33,6 +33,12 @@ export default function Bridge() {
     HRV: contracts.harvestFieldToken.address,
   }
 
+  const tokenAbiMap: Record<BridgeToken, any> = {
+    PXL: contracts.pxlToken.abi,
+    DNGN: contracts.dungeonDropsToken.abi,
+    HRV: contracts.harvestFieldToken.abi,
+  }
+
   // Fetch balances and cosmos address
   const fetchData = useCallback(async () => {
     if (!tba) return
@@ -80,7 +86,7 @@ export default function Bridge() {
     try {
       // Step 1: Approve the CosmoBridge to spend tokens from TBA
       const approveData = encodeFunctionData({
-        abi: contracts.pxlToken.abi,
+        abi: tokenAbiMap[selectedToken],
         functionName: 'approve',
         args: [contracts.cosmoBridge.address, parsedAmount],
       })

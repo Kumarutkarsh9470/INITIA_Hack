@@ -1,5 +1,6 @@
 import { ethers } from "hardhat";
 import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Full Initia-native deploy script.
@@ -8,9 +9,16 @@ import * as fs from "fs";
  */
 
 const ADDRESSES_FILE = "./deployed-addresses.json";
+const FRONTEND_ADDRESSES_FILE = "./frontend/src/lib/deployed-addresses.json";
 
 function saveAddresses(addresses: Record<string, string>) {
-  fs.writeFileSync(ADDRESSES_FILE, JSON.stringify(addresses, null, 2));
+  const json = JSON.stringify(addresses, null, 2);
+  fs.writeFileSync(ADDRESSES_FILE, json);
+  // Keep frontend copy in sync
+  const frontendDir = path.dirname(FRONTEND_ADDRESSES_FILE);
+  if (fs.existsSync(frontendDir)) {
+    fs.writeFileSync(FRONTEND_ADDRESSES_FILE, json);
+  }
 }
 
 async function main() {
@@ -24,9 +32,9 @@ async function main() {
 
   const addresses: Record<string, string> = {};
 
-  // ── 1. PXLToken (now with Cosmos bank registration) ──────
-  console.log("\n── 1/14: PXLToken ──");
-  const PXLToken = await ethers.getContractFactory("PXLToken");
+  // ── 1. PXLTokenInitia (Initia-native, auto-registers with Cosmos bank) ──
+  console.log("\n── 1/14: PXLTokenInitia ──");
+  const PXLToken = await ethers.getContractFactory("PXLTokenInitia");
   const pxl = await PXLToken.deploy(deployer.address);
   await pxl.waitForDeployment();
   addresses.PXLToken = await pxl.getAddress();
@@ -143,34 +151,60 @@ async function main() {
   await gameRegistryContract.setTrustedDEX(addresses.PixelVaultDEX);
   console.log("  setTrustedDEX done");
 
-  // W2: Register games (tokens auto-register with Cosmos bank via ERC20Registry)
+  // W2: Deploy Initia-native game tokens (GameTokenInitia) and register with GameRegistry
   const initialSupply = ethers.parseEther("1000000");
+  const DUNGEON_ID = ethers.keccak256(ethers.toUtf8Bytes("DungeonDrops"));
+  const HARVEST_ID = ethers.keccak256(ethers.toUtf8Bytes("HarvestField"));
 
-  console.log("  Registering DungeonDrops...");
-  const tx1 = await gameRegistryContract.registerGame("DungeonDrops", "DNGN", deployer.address, initialSupply);
-  const r1 = await tx1.wait();
-  const event1 = r1!.logs.find((l) => {
-    try { return gameRegistryContract.interface.parseLog(l as any)?.name === "GameRegistered"; }
-    catch { return false; }
-  });
-  const parsed1 = gameRegistryContract.interface.parseLog(event1 as any);
-  addresses.DungeonDropsToken = parsed1!.args.tokenAddress;
-  addresses.DungeonDropsAssets = parsed1!.args.assetCollection;
+  console.log("  Deploying DungeonDrops token (GameTokenInitia)...");
+  const GameTokenInitiaFactory = await ethers.getContractFactory("GameTokenInitia");
+  const dngnToken = await GameTokenInitiaFactory.deploy("DungeonDrops", "DNGN", DUNGEON_ID, deployer.address, initialSupply);
+  await dngnToken.waitForDeployment();
+  addresses.DungeonDropsToken = await dngnToken.getAddress();
   console.log("  DungeonDrops token:", addresses.DungeonDropsToken);
+
+  console.log("  Deploying DungeonDrops assets...");
+  const GameAssetCollectionFactory = await ethers.getContractFactory("GameAssetCollection");
+  const dungeonAssets = await GameAssetCollectionFactory.deploy("DungeonDrops");
+  await dungeonAssets.waitForDeployment();
+  addresses.DungeonDropsAssets = await dungeonAssets.getAddress();
   console.log("  DungeonDrops assets:", addresses.DungeonDropsAssets);
 
-  console.log("  Registering HarvestField...");
-  const tx2 = await gameRegistryContract.registerGame("HarvestField", "HRV", deployer.address, initialSupply);
-  const r2 = await tx2.wait();
-  const event2 = r2!.logs.find((l) => {
-    try { return gameRegistryContract.interface.parseLog(l as any)?.name === "GameRegistered"; }
-    catch { return false; }
-  });
-  const parsed2 = gameRegistryContract.interface.parseLog(event2 as any);
-  addresses.HarvestFieldToken = parsed2!.args.tokenAddress;
-  addresses.HarvestFieldAssets = parsed2!.args.assetCollection;
+  // Grant roles on dungeon assets to deployer
+  await dungeonAssets.grantRole(ethers.ZeroHash, deployer.address); // admin
+  await dungeonAssets.grantRole(ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE")), deployer.address);
+
+  // Register DungeonDrops with GameRegistry
+  await gameRegistryContract.registerExistingGame(
+    "DungeonDrops", "DNGN",
+    addresses.DungeonDropsToken, addresses.DungeonDropsAssets,
+    deployer.address
+  );
+  console.log("  DungeonDrops registered in GameRegistry");
+
+  console.log("  Deploying HarvestField token (GameTokenInitia)...");
+  const hrvToken = await GameTokenInitiaFactory.deploy("HarvestField", "HRV", HARVEST_ID, deployer.address, initialSupply);
+  await hrvToken.waitForDeployment();
+  addresses.HarvestFieldToken = await hrvToken.getAddress();
   console.log("  HarvestField token:", addresses.HarvestFieldToken);
+
+  console.log("  Deploying HarvestField assets...");
+  const harvestAssets = await GameAssetCollectionFactory.deploy("HarvestField");
+  await harvestAssets.waitForDeployment();
+  addresses.HarvestFieldAssets = await harvestAssets.getAddress();
   console.log("  HarvestField assets:", addresses.HarvestFieldAssets);
+
+  // Grant roles on harvest assets to deployer
+  await harvestAssets.grantRole(ethers.ZeroHash, deployer.address); // admin
+  await harvestAssets.grantRole(ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE")), deployer.address);
+
+  // Register HarvestField with GameRegistry
+  await gameRegistryContract.registerExistingGame(
+    "HarvestField", "HRV",
+    addresses.HarvestFieldToken, addresses.HarvestFieldAssets,
+    deployer.address
+  );
+  console.log("  HarvestField registered in GameRegistry");
   saveAddresses(addresses);
 
   // ── 12. DungeonDrops ─────────────────────────────────────
@@ -204,11 +238,11 @@ async function main() {
   // ── Post-deploy wiring ───────────────────────────────────
   console.log("\n── Post-deploy wiring ──");
 
-  // W3: Grant GAME_ROLE on asset collections
-  const dungeonAssets = await ethers.getContractAt("GameAssetCollection", addresses.DungeonDropsAssets);
-  const harvestAssets = await ethers.getContractAt("GameAssetCollection", addresses.HarvestFieldAssets);
-  await dungeonAssets.grantGameRole(addresses.DungeonDrops);
-  await harvestAssets.grantGameRole(addresses.HarvestField);
+  // W3: Grant GAME_ROLE on asset collections to game contracts
+  const dungeonAssetsWire = await ethers.getContractAt("GameAssetCollection", addresses.DungeonDropsAssets);
+  const harvestAssetsWire = await ethers.getContractAt("GameAssetCollection", addresses.HarvestFieldAssets);
+  await dungeonAssetsWire.grantGameRole(addresses.DungeonDrops);
+  await harvestAssetsWire.grantGameRole(addresses.HarvestField);
   console.log("  GAME_ROLE granted to games");
 
   // W4: Grant ISSUER_ROLE on AchievementBadge
@@ -219,31 +253,29 @@ async function main() {
   console.log("  ISSUER_ROLE granted to games");
 
   // W5: Define items
-  await dungeonAssets.defineItem(1, "https://pixelvault-two.vercel.app/metadata/dungeon/sword.json");
-  await dungeonAssets.defineItem(2, "https://pixelvault-two.vercel.app/metadata/dungeon/shield.json");
-  await dungeonAssets.defineItem(3, "https://pixelvault-two.vercel.app/metadata/dungeon/crown.json");
-  await harvestAssets.defineItem(1, "https://pixelvault-two.vercel.app/metadata/harvest/seasonal.json");
+  await dungeonAssetsWire.defineItem(1, "https://pixelvault-two.vercel.app/metadata/dungeon/sword.json");
+  await dungeonAssetsWire.defineItem(2, "https://pixelvault-two.vercel.app/metadata/dungeon/shield.json");
+  await dungeonAssetsWire.defineItem(3, "https://pixelvault-two.vercel.app/metadata/dungeon/crown.json");
+  await harvestAssetsWire.defineItem(1, "https://pixelvault-two.vercel.app/metadata/harvest/seasonal.json");
   console.log("  Items defined");
 
-  // W6: Define badges
-  const DUNGEON_ID = ethers.keccak256(ethers.toUtf8Bytes("DungeonDrops"));
-  const HARVEST_ID = ethers.keccak256(ethers.toUtf8Bytes("HarvestField"));
+  // W6: Define badges (DUNGEON_ID/HARVEST_ID already defined above in W2)
   await badgeContract.defineBadge(1, DUNGEON_ID, "https://pixelvault-two.vercel.app/metadata/badges/first-clear.json");
   await badgeContract.defineBadge(2, HARVEST_ID, "https://pixelvault-two.vercel.app/metadata/badges/first-harvest.json");
   console.log("  Badges defined");
 
   // W7: Seed DEX liquidity pools
-  const pxlContract = await ethers.getContractAt("PXLToken", addresses.PXLToken);
+  const pxlContract = await ethers.getContractAt("PXLTokenInitia", addresses.PXLToken);
   const dexContract = await ethers.getContractAt("PixelVaultDEX", addresses.PixelVaultDEX);
-  const dngnToken = await ethers.getContractAt("GameToken", addresses.DungeonDropsToken);
-  const hrvToken = await ethers.getContractAt("GameToken", addresses.HarvestFieldToken);
+  const dngnTokenDEX = await ethers.getContractAt("GameTokenInitia", addresses.DungeonDropsToken);
+  const hrvTokenDEX = await ethers.getContractAt("GameTokenInitia", addresses.HarvestFieldToken);
 
   const POOL_PXL = ethers.parseEther("10000");
   const POOL_GAME = ethers.parseEther("100000");
 
   await pxlContract.approve(addresses.PixelVaultDEX, POOL_PXL * 2n);
-  await dngnToken.approve(addresses.PixelVaultDEX, POOL_GAME);
-  await hrvToken.approve(addresses.PixelVaultDEX, POOL_GAME);
+  await dngnTokenDEX.approve(addresses.PixelVaultDEX, POOL_GAME);
+  await hrvTokenDEX.approve(addresses.PixelVaultDEX, POOL_GAME);
   console.log("  Token approvals done");
 
   await dexContract.createPool(DUNGEON_ID, POOL_PXL, POOL_GAME);

@@ -81,7 +81,7 @@ contract InitiaERC20 is IERC20_Initia, Ownable_Initia, ERC20Registry, ERC165_Ini
         return true;
     }
 
-    function mint(address to, uint256 amount) external mintable(to) onlyOwner {
+    function mint(address to, uint256 amount) external virtual mintable(to) onlyOwner {
         _mint(to, amount);
     }
 

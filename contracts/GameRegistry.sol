@@ -93,6 +93,41 @@ contract GameRegistry is Ownable {
         return (address(token), address(assets));
     }
 
+    /**
+     * @notice Register a pre-deployed game token and asset collection.
+     *         Used when deploying Initia-native tokens (GameTokenInitia) outside the factory.
+     */
+    function registerExistingGame(
+        string calldata name,
+        string calldata symbol,
+        address tokenAddress,
+        address assetCollection,
+        address developer
+    ) external onlyOwner returns (bytes32) {
+        bytes32 gameId = keccak256(abi.encodePacked(name));
+        require(games[gameId].tokenAddress == address(0), "Game already exists");
+
+        games[gameId] = GameData({
+            tokenAddress: tokenAddress,
+            assetCollection: assetCollection,
+            developer: developer,
+            name: name,
+            symbol: symbol,
+            totalVolume: 0,
+            uniquePlayers: 0,
+            registeredAt: block.timestamp,
+            active: true
+        });
+
+        tokenToGame[tokenAddress] = gameId;
+        isRegistered[tokenAddress] = true;
+        gameIds.push(gameId);
+
+        emit GameRegistered(gameId, tokenAddress, assetCollection, developer, name);
+
+        return gameId;
+    }
+
     function recordSwap(bytes32 gameId, uint256 volume, address player) external {
         require(msg.sender == trustedDEX, "Only trusted DEX can record swaps");
         
