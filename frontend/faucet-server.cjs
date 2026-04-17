@@ -36,14 +36,27 @@ app.use(express.json())
 const PORT = process.env.PORT || 3001
 const RPC_URL = process.env.EVM_RPC_URL || 'http://127.0.0.1:8545'
 
+// Read addresses from deployed-addresses.json (auto-synced by deploy script)
+const fs = require('fs')
+const path = require('path')
+let deployedAddresses = {}
+try {
+  const addrPath = path.join(__dirname, 'src', 'lib', 'deployed-addresses.json')
+  deployedAddresses = JSON.parse(fs.readFileSync(addrPath, 'utf8'))
+  console.log('Loaded token addresses from deployed-addresses.json')
+} catch (e) {
+  console.warn('Could not read deployed-addresses.json, falling back to env vars')
+}
+
 function safeAddr(raw) {
   if (!raw) return null
   try { return getAddress(raw.trim()) } catch { return null }
 }
 
-const PXL_TOKEN = safeAddr(process.env.PXL_TOKEN_ADDRESS)
-const DNGN_TOKEN = safeAddr(process.env.DNGN_TOKEN_ADDRESS)
-const HRV_TOKEN = safeAddr(process.env.HRV_TOKEN_ADDRESS)
+// Prefer file-based addresses, env vars as fallback
+const PXL_TOKEN = safeAddr(deployedAddresses.PXLToken || process.env.PXL_TOKEN_ADDRESS)
+const DNGN_TOKEN = safeAddr(deployedAddresses.DungeonDropsToken || process.env.DNGN_TOKEN_ADDRESS)
+const HRV_TOKEN = safeAddr(deployedAddresses.HarvestFieldToken || process.env.HRV_TOKEN_ADDRESS)
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -111,7 +124,10 @@ app.post('/api/fund-gas', async (req, res) => {
       chain,
       account,
     })
-    await pub.waitForTransactionReceipt({ hash })
+    const receipt = await pub.waitForTransactionReceipt({ hash })
+    if (receipt.status === 'reverted') {
+      throw new Error(`Fund-gas reverted (tx: ${hash})`)
+    }
 
     return res.json({ ok: true, funded: address, hash })
   } catch (err) {
@@ -166,7 +182,10 @@ app.post('/api/faucet', async (req, res) => {
         nonce,
       })
       nonce++
-      await pub.waitForTransactionReceipt({ hash })
+      const receipt = await pub.waitForTransactionReceipt({ hash })
+      if (receipt.status === 'reverted') {
+        throw new Error(`Transfer reverted for token ${token} (tx: ${hash})`)
+      }
       return hash
     }
 

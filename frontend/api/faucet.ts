@@ -9,15 +9,19 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-// Normalize env-var addresses to EIP-55 checksum (handles wrong case / trailing whitespace)
+// Import addresses from the build-time JSON (always in sync after deploy)
+import deployedAddresses from '../src/lib/deployed-addresses.json'
+
+// Normalize address to EIP-55 checksum
 function safeAddr(raw: string | undefined): `0x${string}` | null {
   if (!raw) return null
   try { return getAddress(raw.trim()) } catch { return null }
 }
 
-const PXL_TOKEN = safeAddr(process.env.PXL_TOKEN_ADDRESS)
-const DNGN_TOKEN = safeAddr(process.env.DNGN_TOKEN_ADDRESS)
-const HRV_TOKEN = safeAddr(process.env.HRV_TOKEN_ADDRESS)
+// Use deployed-addresses.json (committed with each deploy), env vars as fallback
+const PXL_TOKEN = safeAddr(deployedAddresses.PXLToken || process.env.PXL_TOKEN_ADDRESS)
+const DNGN_TOKEN = safeAddr(deployedAddresses.DungeonDropsToken || process.env.DNGN_TOKEN_ADDRESS)
+const HRV_TOKEN = safeAddr(deployedAddresses.HarvestFieldToken || process.env.HRV_TOKEN_ADDRESS)
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -90,7 +94,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         nonce,
       })
       nonce++
-      await pub.waitForTransactionReceipt({ hash })
+      const receipt = await pub.waitForTransactionReceipt({ hash })
+      if (receipt.status === 'reverted') {
+        throw new Error(`Transfer reverted for token ${token} (tx: ${hash})`)
+      }
       return hash
     }
 

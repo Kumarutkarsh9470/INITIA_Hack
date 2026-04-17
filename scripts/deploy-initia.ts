@@ -284,6 +284,16 @@ async function main() {
   await dexContract.createPool(HARVEST_ID, POOL_PXL, POOL_GAME);
   console.log("  HRV/PXL pool created");
 
+  // W8: Fund HarvestField contract with HRV for staking rewards
+  const REWARD_FUND = ethers.parseEther("50000");
+  await hrvTokenDEX.transfer(addresses.HarvestField, REWARD_FUND);
+  console.log("  HarvestField funded with 50,000 HRV for staking rewards");
+
+  // W9: Fund DungeonDrops contract with DNGN (entry fees get collected, but game needs initial balance for smoother UX)
+  // DungeonDrops charges entry fees (safeTransferFrom) so no funding needed — players pay in
+
+  saveAddresses(addresses);
+
   // ── Summary ──────────────────────────────────────────────
   console.log("\n╔══════════════════════════════════════════════════╗");
   console.log("║  ✅ Full Initia-native deploy complete!           ║");
