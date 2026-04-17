@@ -9,8 +9,15 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
-// Import addresses from the build-time JSON (always in sync after deploy)
-import deployedAddresses from '../src/lib/deployed-addresses.json'
+// Load addresses: try deployed-addresses.json first (bundled by Vercel nft),
+// then fall back to env vars
+let deployedAddresses: Record<string, string> = {}
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  deployedAddresses = require('../src/lib/deployed-addresses.json')
+} catch {
+  // File not available — will use env vars below
+}
 
 // Normalize address to EIP-55 checksum
 function safeAddr(raw: string | undefined): `0x${string}` | null {
@@ -18,7 +25,7 @@ function safeAddr(raw: string | undefined): `0x${string}` | null {
   try { return getAddress(raw.trim()) } catch { return null }
 }
 
-// Use deployed-addresses.json (committed with each deploy), env vars as fallback
+// Prefer file-based addresses, env vars as fallback
 const PXL_TOKEN = safeAddr(deployedAddresses.PXLToken || process.env.PXL_TOKEN_ADDRESS)
 const DNGN_TOKEN = safeAddr(deployedAddresses.DungeonDropsToken || process.env.DNGN_TOKEN_ADDRESS)
 const HRV_TOKEN = safeAddr(deployedAddresses.HarvestFieldToken || process.env.HRV_TOKEN_ADDRESS)
