@@ -242,12 +242,20 @@ export function usePlayerProfile(): PlayerProfileData {
         })
         if (!faucetRes.ok) {
           const errBody = await faucetRes.json().catch(() => ({}))
-          console.error('Auto-faucet returned error:', faucetRes.status, errBody)
-        } else {
-          console.log('Auto-faucet sent starter tokens to', tbaAddr)
+          console.warn('Auto-faucet returned error:', faucetRes.status, errBody)
+          // Retry once after a short delay
+          await new Promise(r => setTimeout(r, 2000))
+          const retry = await fetch('/api/faucet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tba: tbaAddr }),
+          })
+          if (!retry.ok) {
+            console.error('Auto-faucet retry also failed — user can claim from Dashboard')
+          }
         }
       } catch (faucetErr) {
-        console.error('Auto-faucet failed (tokens can be claimed from Dashboard):', faucetErr)
+        console.warn('Auto-faucet failed (tokens can be claimed from Dashboard):', faucetErr)
       }
     },
     [initiaAddress, requestTxBlock, fetchProfile],

@@ -148,18 +148,27 @@ export default function ProfileDashboard() {
             onClick={async () => {
               setIsClaiming(true)
               try {
-                const res = await fetch('/api/faucet', {
+                let res = await fetch('/api/faucet', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ tba }),
                 })
+                // Retry once on failure
+                if (!res.ok) {
+                  await new Promise(r => setTimeout(r, 2000))
+                  res = await fetch('/api/faucet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tba }),
+                  })
+                }
                 const json = await res.json()
                 if (!res.ok) throw new Error(json.error || 'Faucet failed')
                 toast.success('Starter tokens sent! Refreshing…')
-                setTimeout(() => window.location.reload(), 2000)
+                // Wait a bit for chain confirmation then reload
+                setTimeout(() => window.location.reload(), 4000)
               } catch (err: any) {
                 const msg = err?.message || 'Failed to claim tokens'
-                // Show a user-friendly message, not the raw viem error
                 toast.error(msg.length > 80 ? 'Failed to claim tokens — please try again' : msg)
               } finally {
                 setIsClaiming(false)

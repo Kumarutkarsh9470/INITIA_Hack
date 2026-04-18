@@ -32,6 +32,7 @@ export default function Bridge() {
   const { initiaAddress, requestTxBlock } = useInterwovenKit()
   const { execute, isPending } = useTBA()
 
+  const [isBridging, setIsBridging] = useState(false)
   const [selectedToken, setSelectedToken] = useState<BridgeToken>('PXL')
   const [amount, setAmount] = useState('')
   const [receiver, setReceiver] = useState('')
@@ -97,8 +98,9 @@ export default function Bridge() {
   const isValidReceiver = receiver.startsWith('init1') && receiver.length >= 40
 
   const handleBridge = async () => {
-    if (!tba || !hasSufficientBalance || !isValidReceiver || !initiaAddress) return
+    if (!tba || !hasSufficientBalance || !isValidReceiver || !initiaAddress || isBridging) return
     setBridgeError(null)
+    setIsBridging(true)
 
     try {
       // Get user's EVM address from their Cosmos address
@@ -193,6 +195,8 @@ export default function Bridge() {
         setBridgeError('Bridge transaction failed. This may happen if the IBC relayer is not currently running or the token is not registered with the Cosmos bank module.')
         toast.error('Bridge failed')
       }
+    } finally {
+      setIsBridging(false)
     }
   }
 
@@ -324,10 +328,10 @@ export default function Bridge() {
         {/* Bridge button */}
         <button
           onClick={handleBridge}
-          disabled={isPending || !hasSufficientBalance || !isValidReceiver || parsedAmount === 0n}
+          disabled={isPending || isBridging || !hasSufficientBalance || !isValidReceiver || parsedAmount === 0n}
           className="w-full btn-primary py-3.5 text-sm font-semibold disabled:opacity-50"
         >
-          {isPending ? 'Bridging…' : !isValidReceiver ? 'Enter receiver address' : parsedAmount === 0n ? 'Enter amount' : !hasSufficientBalance ? 'Insufficient balance' : `Bridge ${amount} ${selectedToken} to L1`}
+          {isPending || isBridging ? 'Bridging…' : !isValidReceiver ? 'Enter receiver address' : parsedAmount === 0n ? 'Enter amount' : !hasSufficientBalance ? 'Insufficient balance' : `Bridge ${amount} ${selectedToken} to L1`}
         </button>
       </div>
 

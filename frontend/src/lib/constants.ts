@@ -28,8 +28,8 @@ export const HARVEST_ITEMS: Record<number, string> = {
 // ERC1155 item IDs for CosmicRacer
 export const COSMIC_ITEMS: Record<number, string> = {
   1: 'Speed Boost',
-  2: 'Turbo Engine',
-  3: 'Legendary Chassis',
+  2: 'Nitro Tank',
+  3: 'Turbo Engine',
 }
 
 // Achievement badge IDs
