@@ -136,8 +136,8 @@ export default function ProfileDashboard() {
         ))}
       </div>
 
-      {/* Faucet claim banner — shown when all balances are zero */}
-      {!isLoadingData && pxlBalance === 0n && Object.values(tokenBalances).every(b => b === 0n) && tba && (
+      {/* Faucet claim banner — shown when any expected token balance is zero */}
+      {!isLoadingData && (pxlBalance === 0n || Object.values(tokenBalances).some(b => b === 0n)) && tba && (
         <div className="card p-5 border-brand-200 bg-brand-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-surface-900">No tokens yet?</p>
@@ -164,17 +164,21 @@ export default function ProfileDashboard() {
                 const json = await res.json()
                 if (!res.ok) throw new Error(json.error || 'Faucet failed')
                 toast.success('Tokens submitted! Waiting for chain confirmation…')
+                // Find a token that currently has zero balance to poll
+                const zeroToken = games.find(g => (tokenBalances[g.symbol] ?? 0n) === 0n)
+                const pollAddress = pxlBalance === 0n ? contracts.pxlToken.address : zeroToken?.tokenAddress ?? contracts.pxlToken.address
+                const prevBal = pxlBalance === 0n ? 0n : (zeroToken ? (tokenBalances[zeroToken.symbol] ?? 0n) : pxlBalance)
                 // Poll for balance changes — txs are submitted but may not be mined yet
                 for (let attempt = 0; attempt < 18; attempt++) {
                   await new Promise(r => setTimeout(r, 5000))
                   try {
-                    const pxl = await publicClient.readContract({
-                      address: contracts.pxlToken.address,
+                    const bal = await publicClient.readContract({
+                      address: pollAddress,
                       abi: contracts.pxlToken.abi,
                       functionName: 'balanceOf',
                       args: [tba],
                     }) as bigint
-                    if (pxl > 0n) {
+                    if (bal > prevBal) {
                       toast.success('Starter tokens received!')
                       await fetchAll()
                       return
