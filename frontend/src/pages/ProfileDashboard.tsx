@@ -163,10 +163,27 @@ export default function ProfileDashboard() {
                 }
                 const json = await res.json()
                 if (!res.ok) throw new Error(json.error || 'Faucet failed')
-                toast.success('Starter tokens sent! Updating balances…')
-                // Faucet waits for on-chain confirmation before responding,
-                // so balances are already available — just refetch
-                await fetchAll()
+                toast.success('Tokens submitted! Waiting for chain confirmation…')
+                // Poll for balance changes — txs are submitted but may not be mined yet
+                for (let attempt = 0; attempt < 18; attempt++) {
+                  await new Promise(r => setTimeout(r, 5000))
+                  try {
+                    const pxl = await publicClient.readContract({
+                      address: contracts.pxlToken.address,
+                      abi: contracts.pxlToken.abi,
+                      functionName: 'balanceOf',
+                      args: [tba],
+                    }) as bigint
+                    if (pxl > 0n) {
+                      toast.success('Starter tokens received!')
+                      await fetchAll()
+                      return
+                    }
+                  } catch { /* retry */ }
+                }
+                // If we get here, polling timed out — reload as last resort
+                toast('Tokens sent — refreshing page…', { icon: '⏳' })
+                window.location.reload()
               } catch (err: any) {
                 const msg = err?.message || 'Failed to claim tokens'
                 toast.error(msg.length > 80 ? 'Failed to claim tokens — please try again' : msg)

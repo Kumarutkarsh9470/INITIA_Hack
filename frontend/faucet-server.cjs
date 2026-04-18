@@ -194,17 +194,9 @@ app.post('/api/faucet', async (req, res) => {
       sendTx(RACE_TOKEN, parseEther('500')),
     ])
 
-    // Wait for all receipts in parallel (all likely in same block)
-    const receipts = await Promise.all(
-      hashes.map(hash => pub.waitForTransactionReceipt({ hash }))
-    )
-    for (const receipt of receipts) {
-      if (receipt.status === 'reverted') {
-        throw new Error(`Transfer reverted (tx: ${receipt.transactionHash})`)
-      }
-    }
-
-    return res.json({ ok: true, funded: tba })
+    // Return immediately — don't wait for receipts.
+    // Frontend will poll balances until they update.
+    return res.json({ ok: true, funded: tba, txHashes: hashes })
   } catch (err) {
     console.error('Faucet error:', err)
     return res.status(500).json({ error: err?.message || 'Faucet transfer failed' })

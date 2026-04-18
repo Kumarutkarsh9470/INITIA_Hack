@@ -9,6 +9,9 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 
+// Increase Vercel serverless function timeout (Hobby: max 60s)
+export const config = { maxDuration: 60 }
+
 // Load addresses: try deployed-addresses.json first (bundled by Vercel nft),
 // then fall back to env vars
 let deployedAddresses: Record<string, string> = {}
@@ -112,17 +115,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sendTx(RACE_TOKEN, parseEther('500')),
     ])
 
-    // Wait for all receipts in parallel (all likely in same block)
-    const receipts = await Promise.all(
-      hashes.map(hash => pub.waitForTransactionReceipt({ hash }))
-    )
-    for (const receipt of receipts) {
-      if (receipt.status === 'reverted') {
-        throw new Error(`Transfer reverted (tx: ${receipt.transactionHash})`)
-      }
-    }
-
-    return res.status(200).json({ ok: true, funded: tba })
+    // Return immediately — don't wait for receipts (avoids serverless timeout).
+    // Frontend will poll balances until they update.
+    return res.status(200).json({
+      ok: true,
+      funded: tba,
+      txHashes: hashes,
+    })
   } catch (err: any) {
     console.error('Faucet error:', err)
     return res.status(500).json({ error: err?.message || 'Faucet transfer failed' })

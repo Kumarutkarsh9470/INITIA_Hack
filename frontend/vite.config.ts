@@ -186,20 +186,16 @@ function faucetPlugin(): Plugin {
             return client.sendTransaction({ to: token, data, chain, account, nonce: currentNonce })
           }
 
-          // Send all transactions without waiting, then confirm in parallel
+          // Send all transactions without waiting, return immediately
           const hashes = await Promise.all([
             sendTx(pxl, parseEther('10000')),
             sendTx(dngn, parseEther('500')),
             sendTx(hrv, parseEther('500')),
             sendTx(race, parseEther('500')),
           ])
-          const receipts = await Promise.all(hashes.map(hash => pub.waitForTransactionReceipt({ hash })))
-          for (const r of receipts) {
-            if (r.status === 'reverted') throw new Error(`Transfer reverted (tx: ${r.transactionHash})`)
-          }
 
           res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ ok: true, funded: tba }))
+          res.end(JSON.stringify({ ok: true, funded: tba, txHashes: hashes }))
         } catch (err: any) {
           console.error('Faucet error:', err)
           res.writeHead(500, { 'Content-Type': 'application/json' })
