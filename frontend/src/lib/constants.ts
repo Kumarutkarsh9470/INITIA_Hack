@@ -1,13 +1,16 @@
 // Pre-computed keccak256 hashes of game names (used as gameId in contracts)
 export const DUNGEON_GAME_ID = '0x8a7faac11b689a5f91556fc9d00fefebcd250de9c9f98f764e8d91ef11653098' as `0x${string}`
 export const HARVEST_GAME_ID = '0xa97480cebb0845f01cfdff40d4ecb12b5ad61dc0c8763e8fe6596d9648937609' as `0x${string}`
+export const COSMIC_GAME_ID = '0x6301dec68b99b5b7bdfc76771c038abaf90a8339b7cd66385bd674a3107a9dc9' as `0x${string}`
 
 // Lookup table: token symbol → game ID (used by DEX, Marketplace, etc.)
 export const GAME_IDS: Record<string, `0x${string}`> = {
   DNGN: DUNGEON_GAME_ID,
   HRV: HARVEST_GAME_ID,
+  RACE: COSMIC_GAME_ID,
   DUNGEON: DUNGEON_GAME_ID,
   HARVEST: HARVEST_GAME_ID,
+  COSMIC: COSMIC_GAME_ID,
 }
 
 // ERC1155 item IDs for DungeonDrops
@@ -22,10 +25,18 @@ export const HARVEST_ITEMS: Record<number, string> = {
   1: 'Seasonal Harvest Item',
 }
 
+// ERC1155 item IDs for CosmicRacer
+export const COSMIC_ITEMS: Record<number, string> = {
+  1: 'Speed Boost',
+  2: 'Turbo Engine',
+  3: 'Legendary Chassis',
+}
+
 // Achievement badge IDs
 export const BADGE_NAMES: Record<number, string> = {
   1: 'First Clear (Dungeon)',
   2: 'First Harvest',
+  3: 'First Race (Cosmic)',
 }
 
 // Contract name mapping (for GasSettings display)

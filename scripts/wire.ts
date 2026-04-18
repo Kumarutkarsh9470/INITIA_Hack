@@ -23,6 +23,16 @@ async function main() {
   await harvestAssets.grantGameRole(addresses.HarvestField);
   console.log("grantGameRole -> HarvestField assets done");
 
+  // ── W1b: Grant admin roles on CosmicRacer assets to deployer ──
+  const cosmicAssets = await ethers.getContractAt(
+    "GameAssetCollection",
+    addresses.CosmicRacerAssets
+  );
+  // deployer already has DEFAULT_ADMIN_ROLE + MINTER_ROLE from registerGame
+  // Grant GAME_ROLE to deployer so we can mint items for demo seeding
+  await cosmicAssets.grantGameRole(deployer.address);
+  console.log("grantGameRole -> CosmicRacer assets (deployer) done");
+
   // ── W2: Grant ISSUER_ROLE on AchievementBadge to game contracts ──
   const badge = await ethers.getContractAt(
     "AchievementBadge",
@@ -55,9 +65,25 @@ async function main() {
   );
   console.log("HarvestField seasonal item defined");
 
+  // ── W4b: Define items on CosmicRacer asset collection ──
+  await cosmicAssets.defineItem(
+    1,
+    "https://pixelvault.vercel.app/metadata/cosmic/1.json"
+  );
+  await cosmicAssets.defineItem(
+    2,
+    "https://pixelvault.vercel.app/metadata/cosmic/2.json"
+  );
+  await cosmicAssets.defineItem(
+    3,
+    "https://pixelvault.vercel.app/metadata/cosmic/3.json"
+  );
+  console.log("CosmicRacer items defined (Speed Boost, Turbo Engine, Legendary Chassis)");
+
   // ── W5: Define badges on AchievementBadge ──
   const dungeonGameId = ethers.keccak256(ethers.toUtf8Bytes("DungeonDrops"));
   const harvestGameId = ethers.keccak256(ethers.toUtf8Bytes("HarvestField"));
+  const cosmicGameId = ethers.keccak256(ethers.toUtf8Bytes("CosmicRacer"));
 
   await badge.defineBadge(
     1,
@@ -69,21 +95,28 @@ async function main() {
     harvestGameId,
     "https://pixelvault.vercel.app/metadata/badges/2.json"
   );
-  console.log("Badges defined (First Clear, First Harvest)");
+  await badge.defineBadge(
+    3,
+    cosmicGameId,
+    "https://pixelvault.vercel.app/metadata/badges/3.json"
+  );
+  console.log("Badges defined (First Clear, First Harvest, First Race)");
 
   // ── W6: Seed DEX liquidity pools ──
   const pxl = await ethers.getContractAt("PXLToken", addresses.PXLToken);
   const dex = await ethers.getContractAt("PixelVaultDEX", addresses.PixelVaultDEX);
   const dngnToken = await ethers.getContractAt("GameToken", addresses.DungeonDropsToken);
   const hrvToken = await ethers.getContractAt("GameToken", addresses.HarvestFieldToken);
+  const raceToken = await ethers.getContractAt("GameToken", addresses.CosmicRacerToken);
 
   const POOL_PXL = ethers.parseEther("10000"); // 10,000 PXL per pool
   const POOL_GAME = ethers.parseEther("100000"); // 100,000 game tokens per pool
 
   // Approve DEX to pull tokens
-  await pxl.approve(addresses.PixelVaultDEX, POOL_PXL * 2n);
+  await pxl.approve(addresses.PixelVaultDEX, POOL_PXL * 3n);
   await dngnToken.approve(addresses.PixelVaultDEX, POOL_GAME);
   await hrvToken.approve(addresses.PixelVaultDEX, POOL_GAME);
+  await raceToken.approve(addresses.PixelVaultDEX, POOL_GAME);
   console.log("Token approvals done");
 
   await dex.createPool(dungeonGameId, POOL_PXL, POOL_GAME);
@@ -91,6 +124,9 @@ async function main() {
 
   await dex.createPool(harvestGameId, POOL_PXL, POOL_GAME);
   console.log("HRV/PXL pool created");
+
+  await dex.createPool(cosmicGameId, POOL_PXL, POOL_GAME);
+  console.log("RACE/PXL pool created");
 
   console.log("\n✅ All wiring complete. System is live.");
 }

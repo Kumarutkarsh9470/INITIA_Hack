@@ -47,6 +47,8 @@ interface Contracts {
   harvestFieldToken: { address: `0x${string}`; abi: typeof GameTokenABI }
   dungeonDropsAssets: { address: `0x${string}`; abi: typeof GameAssetCollectionABI }
   harvestFieldAssets: { address: `0x${string}`; abi: typeof GameAssetCollectionABI }
+  cosmicRacerToken: { address: `0x${string}`; abi: typeof GameTokenABI }
+  cosmicRacerAssets: { address: `0x${string}`; abi: typeof GameAssetCollectionABI }
   erc6551Account: { address: `0x${string}`; abi: typeof ERC6551AccountABI }
   erc6551Registry: { address: `0x${string}`; abi: typeof ERC6551RegistryABI }
   barterMarket: { address: `0x${string}`; abi: typeof BarterMarketABI }
@@ -71,6 +73,8 @@ export function useContracts(): Contracts {
       harvestFieldToken: { address: ADDRESSES.HarvestFieldToken, abi: GameTokenABI },
       dungeonDropsAssets: { address: ADDRESSES.DungeonDropsAssets, abi: GameAssetCollectionABI },
       harvestFieldAssets: { address: ADDRESSES.HarvestFieldAssets, abi: GameAssetCollectionABI },
+      cosmicRacerToken: { address: ADDRESSES.CosmicRacerToken, abi: GameTokenABI },
+      cosmicRacerAssets: { address: ADDRESSES.CosmicRacerAssets, abi: GameAssetCollectionABI },
       erc6551Account: { address: ADDRESSES.ERC6551Account, abi: ERC6551AccountABI },
       erc6551Registry: { address: ADDRESSES.ERC6551Registry, abi: ERC6551RegistryABI },
       barterMarket: { address: (ADDRESSES.BarterMarket ?? '0x0000000000000000000000000000000000000000') as `0x${string}`, abi: BarterMarketABI },

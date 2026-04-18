@@ -15,6 +15,7 @@ interface IGameAssetCollection {
 import "./GameToken.sol";
 import "./GameAssetCollection.sol";
 import "./initia/IERC20Registry.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract GameRegistry is Ownable {
     
@@ -29,6 +30,9 @@ contract GameRegistry is Ownable {
         uint256 registeredAt;
         bool active;
     }
+
+    IERC20 public pxlToken;
+    uint256 public registrationFee = 100 * 1e18; // 100 PXL default
 
     mapping(bytes32 => GameData) public games;
     mapping(address => bytes32) public tokenToGame;
@@ -48,7 +52,9 @@ contract GameRegistry is Ownable {
     event GamePaused(bytes32 indexed gameId);
     event GameResumed(bytes32 indexed gameId);
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address _pxlToken) Ownable(msg.sender) {
+        pxlToken = IERC20(_pxlToken);
+    }
 
     function setTrustedDEX(address dex) external onlyOwner {
         trustedDEX = dex;
@@ -91,6 +97,54 @@ contract GameRegistry is Ownable {
         emit GameRegistered(gameId, address(token), address(assets), developer, name);
 
         return (address(token), address(assets));
+    }
+
+    /**
+     * @notice Permissionless game registration — anyone can register by paying a PXL fee.
+     *         The fee is transferred to the contract owner (protocol treasury).
+     */
+    function registerGameWithFee(
+        string calldata name,
+        string calldata symbol,
+        uint256 initialSupply
+    ) external returns (address, address) {
+        require(registrationFee > 0, "Fee not set");
+        require(pxlToken.transferFrom(msg.sender, owner(), registrationFee), "PXL fee transfer failed");
+
+        bytes32 gameId = keccak256(abi.encodePacked(name));
+        require(games[gameId].tokenAddress == address(0), "Game already exists");
+
+        GameToken token = new GameToken(name, symbol, gameId, msg.sender, initialSupply);
+        GameAssetCollection assets = new GameAssetCollection(name);
+
+        assets.grantRole(bytes32(0), msg.sender);
+        assets.grantRole(keccak256("MINTER_ROLE"), msg.sender);
+        token.transferOwnership(msg.sender);
+
+        games[gameId] = GameData({
+            tokenAddress: address(token),
+            assetCollection: address(assets),
+            developer: msg.sender,
+            name: name,
+            symbol: symbol,
+            totalVolume: 0,
+            uniquePlayers: 0,
+            registeredAt: block.timestamp,
+            active: true
+        });
+
+        tokenToGame[address(token)] = gameId;
+        isRegistered[address(token)] = true;
+        gameIds.push(gameId);
+
+        try ERC20_REGISTRY_CONTRACT.register_erc20_from_factory(address(token)) {} catch {}
+
+        emit GameRegistered(gameId, address(token), address(assets), msg.sender, name);
+        return (address(token), address(assets));
+    }
+
+    function setRegistrationFee(uint256 newFee) external onlyOwner {
+        registrationFee = newFee;
     }
 
     /**

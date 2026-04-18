@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { to: '/bridge', label: 'Bridge' },
   { to: '/marketplace', label: 'Market' },
   { to: '/gas', label: 'Gas' },
-  { to: '/sdk', label: 'SDK' },
+  { to: '/how-it-works', label: 'How It Works' },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {

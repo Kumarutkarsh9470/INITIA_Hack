@@ -55,7 +55,7 @@ async function main() {
 
   // ── 5. GameRegistry ──────────────────────────────────────
   const GameRegistry = await ethers.getContractFactory("GameRegistry");
-  const gameRegistry = await GameRegistry.deploy();
+  const gameRegistry = await GameRegistry.deploy(addresses.PXLToken);
   await gameRegistry.waitForDeployment();
   addresses.GameRegistry = await gameRegistry.getAddress();
   console.log("GameRegistry:", addresses.GameRegistry);
@@ -165,6 +165,27 @@ async function main() {
   addresses.HarvestFieldAssets = parsed2!.args.assetCollection;
   console.log("HarvestField token:", addresses.HarvestFieldToken);
   console.log("HarvestField assets:", addresses.HarvestFieldAssets);
+
+  // Register CosmicRacer game
+  const tx3 = await gameRegistryContract.registerGame(
+    "CosmicRacer",
+    "RACE",
+    deployer.address,
+    initialSupply
+  );
+  const r3 = await tx3.wait();
+  const event3 = r3!.logs.find((l) => {
+    try {
+      return gameRegistryContract.interface.parseLog(l as any)?.name === "GameRegistered";
+    } catch {
+      return false;
+    }
+  });
+  const parsed3 = gameRegistryContract.interface.parseLog(event3 as any);
+  addresses.CosmicRacerToken = parsed3!.args.tokenAddress;
+  addresses.CosmicRacerAssets = parsed3!.args.assetCollection;
+  console.log("CosmicRacer token:", addresses.CosmicRacerToken);
+  console.log("CosmicRacer assets:", addresses.CosmicRacerAssets);
   saveAddresses(addresses);
 
   // ── 11. DungeonDrops ─────────────────────────────────────

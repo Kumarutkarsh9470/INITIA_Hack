@@ -3,12 +3,21 @@ import { formatEther, parseEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
-import { DUNGEON_ITEMS, HARVEST_ITEMS, GAME_IDS, DUNGEON_EXPECTED_COST, DUNGEON_DROP_RATES } from '../lib/constants'
+import { DUNGEON_ITEMS, HARVEST_ITEMS, COSMIC_ITEMS } from '../lib/constants'
 import toast from 'react-hot-toast'
 
 type Listing = { id: bigint; seller: string; collection: string; itemId: bigint; amount: bigint; priceInPXL: bigint; gameId: string; active: boolean }
 type InventoryItem = { collection: `0x${string}`; gameName: string; gameId: `0x${string}`; itemId: number; itemName: string; balance: bigint }
-type GameFilter = 'all' | 'dungeon' | 'harvest' | 'cross-game'
+interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}`; assetCollection: `0x${string}` }
+
+// Combined item name lookup per collection address (populated dynamically)
+const KNOWN_ITEMS: Record<string, Record<number, string>> = {}
+function registerKnownItems(collection: string, symbol: string) {
+  const c = collection.toLowerCase()
+  if (symbol === 'DNGN') KNOWN_ITEMS[c] = DUNGEON_ITEMS
+  else if (symbol === 'HRV') KNOWN_ITEMS[c] = HARVEST_ITEMS
+  else if (symbol === 'RACE') KNOWN_ITEMS[c] = COSMIC_ITEMS
+}
 
 function ammEstimate(amtIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
   if (reserveIn === 0n || reserveOut === 0n || amtIn === 0n) return 0n
@@ -22,39 +31,35 @@ export default function Marketplace() {
   const { execute, isPending } = useTBA()
 
   const [activeTab, setActiveTab] = useState<'browse' | 'list'>('browse')
-  const [gameFilter, setGameFilter] = useState<GameFilter>('all')
+  const [gameFilter, setGameFilter] = useState<string>('all')
   const [isLoading, setIsLoading] = useState(true)
+  const [games, setGames] = useState<RegisteredGame[]>([])
   const [listings, setListings] = useState<Listing[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [listAmount, setListAmount] = useState('1')
   const [listPricePXL, setListPricePXL] = useState('')
-  const [pools, setPools] = useState<{ DNGN: { reservePXL: bigint; reserveGame: bigint }; HRV: { reservePXL: bigint; reserveGame: bigint } }>({
-    DNGN: { reservePXL: 0n, reserveGame: 0n },
-    HRV: { reservePXL: 0n, reserveGame: 0n },
-  })
-  const [ratings, setRatings] = useState<{ DNGN: bigint; HRV: bigint }>({ DNGN: 100n, HRV: 100n })
 
   const fetchData = async () => {
     if (!tba) return
     setIsLoading(true)
     try {
-      // Fetch pool reserves for floor price computation
-      const fetchPool = async (gameId: `0x${string}`) => {
-        const poolData = await publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [gameId] })
-        const arr = poolData as unknown as [string, bigint, bigint, string, boolean, bigint]
-        return { reservePXL: arr[1], reserveGame: arr[2] }
+      // Fetch registered games from GameRegistry
+      const countRaw = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameCount' })
+      const count = Number(countRaw)
+      const fetchedGames: RegisteredGame[] = []
+      for (let i = 0; i < count; i++) {
+        const gameId = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'gameIds', args: [BigInt(i)] }) as `0x${string}`
+        const data = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'games', args: [gameId] }) as any
+        if (data[8] === true) {
+          const game: RegisteredGame = { gameId, name: data[3], symbol: data[4], tokenAddress: data[0], assetCollection: data[1] }
+          fetchedGames.push(game)
+          registerKnownItems(game.assetCollection, game.symbol)
+        }
       }
-      const [dngnPool, hrvPool] = await Promise.all([fetchPool(GAME_IDS.DUNGEON), fetchPool(GAME_IDS.HARVEST)])
-      setPools({ DNGN: dngnPool, HRV: hrvPool })
+      setGames(fetchedGames)
 
-      // Fetch game ratings
-      const [dngnRating, hrvRating] = await Promise.all([
-        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.DUNGEON] }) as Promise<bigint>,
-        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.HARVEST] }) as Promise<bigint>,
-      ])
-      setRatings({ DNGN: dngnRating, HRV: hrvRating })
-
+      // Fetch marketplace listings
       const nextIdRaw = await publicClient.readContract({ address: contracts.marketplace.address, abi: contracts.marketplace.abi, functionName: 'nextListingId' })
       const nextId = Number(nextIdRaw)
       const fetchedListings: Listing[] = []
@@ -66,13 +71,28 @@ export default function Marketplace() {
       }
       setListings(fetchedListings)
 
+      // Fetch inventory across all game asset collections (check items 1-5)
       const userInv: InventoryItem[] = []
-      for (const id of [1, 2, 3]) {
-        const bal = (await publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
-        if (bal > 0n) userInv.push({ collection: contracts.dungeonDropsAssets.address, gameName: 'Dungeon Drops', gameId: GAME_IDS.DUNGEON, itemId: id, itemName: DUNGEON_ITEMS[id as keyof typeof DUNGEON_ITEMS], balance: bal })
+      const erc1155Abi = contracts.dungeonDropsAssets.abi
+      for (const game of fetchedGames) {
+        const items = KNOWN_ITEMS[game.assetCollection.toLowerCase()] ?? {}
+        const maxItem = Math.max(...Object.keys(items).map(Number), 5)
+        for (let id = 1; id <= maxItem; id++) {
+          try {
+            const bal = (await publicClient.readContract({ address: game.assetCollection, abi: erc1155Abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
+            if (bal > 0n) {
+              userInv.push({
+                collection: game.assetCollection,
+                gameName: game.name,
+                gameId: game.gameId,
+                itemId: id,
+                itemName: items[id] ?? `Item #${id}`,
+                balance: bal,
+              })
+            }
+          } catch { /* item doesn't exist */ }
+        }
       }
-      const hBal = (await publicClient.readContract({ address: contracts.harvestFieldAssets.address, abi: contracts.harvestFieldAssets.abi, functionName: 'balanceOf', args: [tba, 1n] })) as bigint
-      if (hBal > 0n) userInv.push({ collection: contracts.harvestFieldAssets.address, gameName: 'Harvest Field', gameId: GAME_IDS.HARVEST, itemId: 1, itemName: HARVEST_ITEMS[1], balance: hBal })
       setInventory(userInv)
     } catch (error) {
       console.error('Error fetching marketplace data:', error)
@@ -82,46 +102,21 @@ export default function Marketplace() {
 
   useEffect(() => { fetchData() }, [tba, contracts])
 
-  // Floor price: convert expected DNGN cost to PXL via AMM, scaled by game rating
-  const getFloorPricePXL = useCallback((collection: string, itemId: bigint): bigint | null => {
-    if (collection === contracts.dungeonDropsAssets.address) {
-      const costInDNGN = DUNGEON_EXPECTED_COST[Number(itemId)]
-      if (!costInDNGN) return null
-      const { reservePXL, reserveGame } = pools.DNGN
-      if (reservePXL === 0n || reserveGame === 0n) return null
-      const basePXL = ammEstimate(costInDNGN, reserveGame, reservePXL)
-      // Scale by rating: rating 100=1star, 200=2star, etc. Multiply by rating/100
-      return basePXL * ratings.DNGN / 100n
-    }
-    if (collection === contracts.harvestFieldAssets.address) {
-      const { reservePXL, reserveGame } = pools.HRV
-      if (reservePXL === 0n || reserveGame === 0n) return null
-      const basePXL = ammEstimate(1000000000000000000n, reserveGame, reservePXL)
-      return basePXL * ratings.HRV / 100n
-    }
-    return null
-  }, [contracts, pools, ratings])
+  // Build game lookup maps
+  const gameByCollection = useMemo(() => {
+    const m = new Map<string, RegisteredGame>()
+    games.forEach(g => m.set(g.assetCollection.toLowerCase(), g))
+    return m
+  }, [games])
+  const gameById = useMemo(() => {
+    const m = new Map<string, RegisteredGame>()
+    games.forEach(g => m.set(g.gameId, g))
+    return m
+  }, [games])
 
-  const getDropRate = (collection: string, itemId: bigint): number | null => {
-    if (collection === contracts.dungeonDropsAssets.address) {
-      return DUNGEON_DROP_RATES[Number(itemId)] ?? null
-    }
-    return null
-  }
-
-  const getPremiumPct = (askPXL: bigint, floorPXL: bigint | null): number | null => {
-    if (!floorPXL || floorPXL === 0n) return null
-    return Number(((askPXL - floorPXL) * 10000n) / floorPXL) / 100
-  }
-
-  // Cross-game filter logic
   const filteredListings = useMemo(() => {
     if (gameFilter === 'all') return listings
-    if (gameFilter === 'dungeon') return listings.filter(l => l.gameId === GAME_IDS.DUNGEON)
-    if (gameFilter === 'harvest') return listings.filter(l => l.gameId === GAME_IDS.HARVEST)
-    // Cross-game: items listed from a different game's collection
-    // (Any listing is inherently cross-game tradeable since PXL is the intermediary)
-    return listings
+    return listings.filter(l => l.gameId === gameFilter)
   }, [listings, gameFilter])
 
   const handleBuy = async (listing: Listing, buyAmount?: bigint) => {
@@ -170,14 +165,11 @@ export default function Marketplace() {
 
   const truncate = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
   const getItemName = (collection: string, id: bigint) => {
-    if (collection === contracts.dungeonDropsAssets.address) return DUNGEON_ITEMS[Number(id) as keyof typeof DUNGEON_ITEMS]
-    if (collection === contracts.harvestFieldAssets.address) return HARVEST_ITEMS[Number(id) as keyof typeof HARVEST_ITEMS]
-    return `Item #${id}`
+    const items = KNOWN_ITEMS[collection.toLowerCase()]
+    return items?.[Number(id)] ?? `Item #${id}`
   }
   const getGameName = (gameId: string) => {
-    if (gameId === GAME_IDS.DUNGEON) return 'Dungeon Drops'
-    if (gameId === GAME_IDS.HARVEST) return 'Harvest Field'
-    return 'Unknown Game'
+    return gameById.get(gameId)?.name ?? 'Unknown Game'
   }
 
   return (
@@ -204,34 +196,26 @@ export default function Marketplace() {
         <div>
           {/* Game Filter */}
           <div className="flex gap-2 mb-4 flex-wrap">
-            {([
-              { key: 'all', label: 'All Games' },
-              { key: 'dungeon', label: 'Dungeon Drops' },
-              { key: 'harvest', label: 'Harvest Field' },
-            ] as { key: GameFilter; label: string }[]).map(({ key, label }) => (
-              <button key={key} onClick={() => setGameFilter(key)}
+            <button onClick={() => setGameFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
+                ${gameFilter === 'all'
+                  ? 'bg-brand-50 border-brand-200 text-brand-700'
+                  : 'bg-surface-50 border-surface-200 text-surface-500 hover:text-surface-700'}`}>
+              All Games
+            </button>
+            {games.map(g => (
+              <button key={g.gameId} onClick={() => setGameFilter(g.gameId)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
-                  ${gameFilter === key
+                  ${gameFilter === g.gameId
                     ? 'bg-brand-50 border-brand-200 text-brand-700'
                     : 'bg-surface-50 border-surface-200 text-surface-500 hover:text-surface-700'}`}>
-                {label}
-                {key !== 'all' && (
-                  <span className="ml-1.5 text-xs opacity-60">
-                    ({listings.filter(l => key === 'dungeon' ? l.gameId === GAME_IDS.DUNGEON : l.gameId === GAME_IDS.HARVEST).length})
-                  </span>
-                )}
+                {g.name}
+                <span className="ml-1.5 text-xs opacity-60">
+                  ({listings.filter(l => l.gameId === g.gameId).length})
+                </span>
               </button>
             ))}
           </div>
-
-          {/* Floor Price Legend */}
-          {(pools.DNGN.reservePXL > 0n || pools.HRV.reservePXL > 0n) && (
-            <div className="bg-surface-50 border border-surface-200 rounded-xl px-3 py-2 mb-4 flex items-center gap-2 text-xs text-surface-500">
-              <span className="text-surface-400">Floor prices from DEX rates</span>
-              <span className="text-surface-300">·</span>
-              <span className="text-surface-400">Green = below floor</span>
-            </div>
-          )}
 
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
@@ -245,44 +229,15 @@ export default function Marketplace() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredListings.map((listing, i) => {
-                const floorPXL = getFloorPricePXL(listing.collection, listing.itemId)
-                const premium = getPremiumPct(listing.priceInPXL, floorPXL)
-                const dropRate = getDropRate(listing.collection, listing.itemId)
-                const isBelowFloor = premium !== null && premium < 0
-                const isHarvest = listing.gameId === GAME_IDS.HARVEST
                 return (
-                <div key={listing.id.toString()} className={`card-hover p-5 flex flex-col justify-between animate-fade-in-up ${isBelowFloor ? 'ring-2 ring-emerald-300' : ''}`} style={{ animationDelay: `${i * 80}ms` }}>
+                <div key={listing.id.toString()} className="card-hover p-5 flex flex-col justify-between animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
                   <div>
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-bold text-surface-900">{getItemName(listing.collection, listing.itemId)}</h3>
                       <span className="badge">Qty: {listing.amount.toString()}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-surface-500">{getGameName(listing.gameId)}</p>
-                      {dropRate !== null && (
-                        <span className="text-xs bg-surface-100 text-surface-500 px-1.5 py-0.5 rounded">{dropRate}% drop</span>
-                      )}
-                    </div>
+                    <p className="text-sm text-surface-500">{getGameName(listing.gameId)}</p>
                     <p className="text-xs text-surface-400 mt-0.5">Seller: {truncate(listing.seller)}</p>
-
-                    {/* Floor Price & Premium */}
-                    {floorPXL !== null && floorPXL > 0n && (
-                      <div className="mt-2 bg-surface-50 rounded-lg p-2 border border-surface-100">
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-surface-400">{isHarvest ? 'Ref. value' : 'Floor price'}</span>
-                          <span className="font-mono text-surface-500">{parseFloat(formatEther(floorPXL)).toFixed(2)} PXL</span>
-                        </div>
-                        {premium !== null && (
-                          <div className="flex justify-between items-center text-xs mt-0.5">
-                            <span className="text-surface-400">vs. asking</span>
-                            <span className={`font-semibold ${premium < 0 ? 'text-emerald-600' : premium > 50 ? 'text-red-500' : 'text-amber-600'}`}>
-                              {premium > 0 ? '+' : ''}{premium.toFixed(1)}%
-                              {premium < 0 && ' (below floor!)'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-100">
                     <div>
@@ -295,7 +250,7 @@ export default function Marketplace() {
                     <button onClick={() => handleBuy(listing)}
                       disabled={isPending || listing.seller.toLowerCase() === tba?.toLowerCase()}
                       className="btn-primary px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                      {listing.seller.toLowerCase() === tba?.toLowerCase() ? 'Your Listing' : isBelowFloor ? 'Buy (Deal!)' : 'Buy Now'}
+                      {listing.seller.toLowerCase() === tba?.toLowerCase() ? 'Your Listing' : 'Buy Now'}
                     </button>
                   </div>
                 </div>
@@ -350,27 +305,6 @@ export default function Marketplace() {
                   <p className="stat-label">Selected Item</p>
                   <p className="font-semibold text-surface-900 text-lg">{selectedItem.itemName}</p>
                 </div>
-
-                {/* Floor price hint for seller */}
-                {(() => {
-                  const floor = getFloorPricePXL(selectedItem.collection, BigInt(selectedItem.itemId))
-                  const dropRate = getDropRate(selectedItem.collection, BigInt(selectedItem.itemId))
-                  if (!floor || floor === 0n) return null
-                  const floorStr = parseFloat(formatEther(floor)).toFixed(2)
-                  return (
-                    <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-xs text-surface-500">
-                      <div className="flex items-center justify-between">
-                        <span>Production floor</span>
-                        <span className="font-mono font-semibold text-surface-700">{floorStr} PXL</span>
-                      </div>
-                      {dropRate && <p className="text-surface-400 mt-0.5">{dropRate}% drop rate</p>}
-                      <button type="button" onClick={() => setListPricePXL(floorStr)}
-                        className="mt-1.5 text-brand-600 hover:text-brand-700 text-xs font-medium">
-                        Use floor price
-                      </button>
-                    </div>
-                  )
-                })()}
 
                 <div>
                   <label className="text-xs font-medium text-surface-500 uppercase tracking-wider block mb-1">Quantity</label>

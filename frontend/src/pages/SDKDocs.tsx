@@ -5,15 +5,16 @@ const INTEGRATION_STEPS = [
     step: '1',
     title: 'Register Your Game',
     description: 'Call GameRegistry to register your game. You receive a unique gameId, a deployed ERC-20 token, and an ERC-1155 item collection — all managed by the protocol.',
-    code: `// Register game on-chain (one-time setup)
-const tx = await gameRegistry.registerGame(
+    code: `// Permissionless game registration (costs 100 PXL)
+await pxlToken.approve(gameRegistry, 100e18);
+const tx = await gameRegistry.registerGameWithFee(
   "MyRPG",                    // game name
-  developerAddress,           // developer wallet
   "RPG Gold",                 // token name
   "RPGG",                     // token symbol
   1_000_000e18                // initial token supply
 );
-// Returns: gameId, gameToken address, assetCollection address`,
+// Returns: gameId, gameToken address, assetCollection address
+// Caller automatically gets GAME_ROLE on both contracts`,
   },
   {
     step: '2',
@@ -105,15 +106,15 @@ const CONTRACTS_TABLE = [
   { contract: 'GasPaymaster', role: 'Meta-tx relayer (ERC-2771)', usage: 'Pay gas with game tokens' },
 ]
 
-export default function SDKDocs() {
+export default function HowItWorks() {
   return (
     <div className="space-y-8 max-w-4xl">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <span className="badge bg-brand-50 text-brand-700 border border-brand-200">Developer Documentation</span>
+          <span className="badge bg-brand-50 text-brand-700 border border-brand-200">Platform Architecture</span>
         </div>
-        <h1 className="page-title text-3xl">PixelVault SDK</h1>
+        <h1 className="page-title text-3xl">How It Works</h1>
         <p className="text-surface-500 mt-2 leading-relaxed max-w-2xl">
           PixelVault is <strong className="text-surface-700">on-chain game economy infrastructure</strong>. 
           Any game engine — Unity, Unreal, web-based — plugs into the shared protocol. 

@@ -3,19 +3,28 @@ import { formatEther } from 'viem'
 import { Link } from 'react-router-dom'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
-import { DUNGEON_ITEMS, HARVEST_ITEMS, BADGE_NAMES } from '../lib/constants'
+import { DUNGEON_ITEMS, HARVEST_ITEMS, COSMIC_ITEMS, BADGE_NAMES } from '../lib/constants'
 import TradingAdvisor from '../components/TradingAdvisor'
 import toast from 'react-hot-toast'
+
+interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}`; assetCollection: `0x${string}` }
+
+const KNOWN_ITEMS: Record<string, Record<number, string>> = {}
+function registerKnownItems(collection: string, symbol: string) {
+  const c = collection.toLowerCase()
+  if (symbol === 'DNGN') KNOWN_ITEMS[c] = DUNGEON_ITEMS
+  else if (symbol === 'HRV') KNOWN_ITEMS[c] = HARVEST_ITEMS
+  else if (symbol === 'RACE') KNOWN_ITEMS[c] = COSMIC_ITEMS
+}
 
 export default function ProfileDashboard() {
   const { tokenId, tba, username, reputation } = usePlayerProfile()
   const contracts = useContracts()
 
   const [pxlBalance, setPxlBalance] = useState(0n)
-  const [dngnBalance, setDngnBalance] = useState(0n)
-  const [hrvBalance, setHrvBalance] = useState(0n)
-  const [dungeonItems, setDungeonItems] = useState<Record<number, bigint>>({})
-  const [harvestItems, setHarvestItems] = useState<Record<number, bigint>>({})
+  const [games, setGames] = useState<RegisteredGame[]>([])
+  const [tokenBalances, setTokenBalances] = useState<Record<string, bigint>>({})
+  const [allItems, setAllItems] = useState<{ name: string; count: bigint; game: string }[]>([])
   const [badges, setBadges] = useState<Record<number, bigint>>({})
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isClaiming, setIsClaiming] = useState(false)
@@ -27,72 +36,59 @@ export default function ProfileDashboard() {
     const fetchAll = async () => {
       setIsLoadingData(true)
       try {
-        const [pxl, dngn, hrv] = await Promise.all([
-          publicClient.readContract({
-            address: contracts.pxlToken.address,
-            abi: contracts.pxlToken.abi,
-            functionName: 'balanceOf',
-            args: [tba],
-          }),
-          publicClient.readContract({
-            address: contracts.dungeonDropsToken.address,
-            abi: contracts.dungeonDropsToken.abi,
-            functionName: 'balanceOf',
-            args: [tba],
-          }),
-          publicClient.readContract({
-            address: contracts.harvestFieldToken.address,
-            abi: contracts.harvestFieldToken.abi,
-            functionName: 'balanceOf',
-            args: [tba],
-          }),
-        ])
-        setPxlBalance(pxl as bigint)
-        setDngnBalance(dngn as bigint)
-        setHrvBalance(hrv as bigint)
-
-        const dItems: Record<number, bigint> = {}
-        for (const id of [1, 2, 3]) {
-          const bal = (await publicClient.readContract({
-            address: contracts.dungeonDropsAssets.address,
-            abi: contracts.dungeonDropsAssets.abi,
-            functionName: 'balanceOf',
-            args: [tba, BigInt(id)],
-          })) as bigint
-          dItems[id] = bal
+        // Fetch registered games
+        const countRaw = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameCount' })
+        const count = Number(countRaw)
+        const fetchedGames: RegisteredGame[] = []
+        for (let i = 0; i < count; i++) {
+          const gameId = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'gameIds', args: [BigInt(i)] }) as `0x${string}`
+          const data = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'games', args: [gameId] }) as any
+          if (data[8] === true) {
+            const game: RegisteredGame = { gameId, name: data[3], symbol: data[4], tokenAddress: data[0], assetCollection: data[1] }
+            fetchedGames.push(game)
+            registerKnownItems(game.assetCollection, game.symbol)
+          }
         }
-        setDungeonItems(dItems)
+        setGames(fetchedGames)
 
-        const hItems: Record<number, bigint> = {}
-        const hBal = (await publicClient.readContract({
-          address: contracts.harvestFieldAssets.address,
-          abi: contracts.harvestFieldAssets.abi,
-          functionName: 'balanceOf',
-          args: [tba, 1n],
-        })) as bigint
-        hItems[1] = hBal
-        setHarvestItems(hItems)
+        // PXL balance
+        const pxl = await publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as bigint
+        setPxlBalance(pxl)
 
+        // Game token balances
+        const balances: Record<string, bigint> = {}
+        for (const game of fetchedGames) {
+          balances[game.symbol] = (await publicClient.readContract({ address: game.tokenAddress, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] })) as bigint
+        }
+        setTokenBalances(balances)
+
+        // Items across all games
+        const items: { name: string; count: bigint; game: string }[] = []
+        const erc1155Abi = contracts.dungeonDropsAssets.abi
+        for (const game of fetchedGames) {
+          const knownMap = KNOWN_ITEMS[game.assetCollection.toLowerCase()] ?? {}
+          const maxItem = Math.max(...Object.keys(knownMap).map(Number), 5)
+          for (let id = 1; id <= maxItem; id++) {
+            try {
+              const bal = (await publicClient.readContract({ address: game.assetCollection, abi: erc1155Abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
+              items.push({ name: knownMap[id] ?? `Item #${id}`, count: bal, game: game.name })
+            } catch { /* skip */ }
+          }
+        }
+        setAllItems(items)
+
+        // Badges
         const b: Record<number, bigint> = {}
-        for (const id of [1, 2]) {
-          const bal = (await publicClient.readContract({
-            address: contracts.achievementBadge.address,
-            abi: contracts.achievementBadge.abi,
-            functionName: 'balanceOf',
-            args: [tba, BigInt(id)],
-          })) as bigint
+        const badgeIds = Object.keys(BADGE_NAMES).map(Number)
+        for (const id of badgeIds) {
+          const bal = (await publicClient.readContract({ address: contracts.achievementBadge.address, abi: contracts.achievementBadge.abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
           b[id] = bal
         }
         setBadges(b)
 
-        // Fetch Cosmos address
+        // Cosmos address
         try {
-          const cosAddr = await publicClient.readContract({
-            address: contracts.cosmoBridge.address,
-            abi: contracts.cosmoBridge.abi,
-            functionName: 'getCosmosAddress',
-            args: [tba],
-          })
+          const cosAddr = await publicClient.readContract({ address: contracts.cosmoBridge.address, abi: contracts.cosmoBridge.abi, functionName: 'getCosmosAddress', args: [tba] })
           setCosmosAddr(cosAddr as string)
         } catch { /* precompile not available */ }
       } catch (error) {
@@ -108,7 +104,8 @@ export default function ProfileDashboard() {
 
   const truncate = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
 
-  const totalTokenValue = parseFloat(formatEther(pxlBalance)) + parseFloat(formatEther(dngnBalance)) + parseFloat(formatEther(hrvBalance))
+  const totalTokenValue = parseFloat(formatEther(pxlBalance)) + Object.values(tokenBalances).reduce((a, b) => a + parseFloat(formatEther(b)), 0)
+  const totalItems = allItems.reduce((a, b) => a + Number(b.count), 0)
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -130,7 +127,7 @@ export default function ProfileDashboard() {
         {[
           { label: 'Total Tokens', value: totalTokenValue.toFixed(2) },
           { label: 'Reputation', value: reputation.toString() },
-          { label: 'Items Owned', value: Object.values(dungeonItems).reduce((a, b) => a + b, 0n).toString() },
+          { label: 'Items Owned', value: totalItems.toString() },
           { label: 'Badges Earned', value: Object.values(badges).filter(b => b > 0n).length.toString() },
         ].map((stat, i) => (
           <div key={stat.label} className="card p-5 animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
@@ -141,7 +138,7 @@ export default function ProfileDashboard() {
       </div>
 
       {/* Faucet claim banner — shown when all balances are zero */}
-      {!isLoadingData && pxlBalance === 0n && dngnBalance === 0n && hrvBalance === 0n && tba && (
+      {!isLoadingData && pxlBalance === 0n && Object.values(tokenBalances).every(b => b === 0n) && tba && (
         <div className="card p-5 border-brand-200 bg-brand-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-surface-900">No tokens yet?</p>
@@ -191,8 +188,9 @@ export default function ProfileDashboard() {
         ) : (
           <div className="space-y-2">
             <TokenRow label="PXL" balance={pxlBalance} desc="Platform Token" />
-            <TokenRow label="DNGN" balance={dngnBalance} desc="Dungeon Drops" />
-            <TokenRow label="HRV" balance={hrvBalance} desc="Harvest Field" />
+            {games.map(g => (
+              <TokenRow key={g.symbol} label={g.symbol} balance={tokenBalances[g.symbol] ?? 0n} desc={g.name} />
+            ))}
           </div>
         )}
       </div>
@@ -209,12 +207,12 @@ export default function ProfileDashboard() {
           <div className="animate-pulse h-20 bg-surface-100 rounded-xl" />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {Object.entries(DUNGEON_ITEMS).map(([id, name]) => (
-              <ItemCard key={`d-${id}`} name={name} count={dungeonItems[Number(id)] ?? 0n} game="Dungeon" />
+            {allItems.filter(it => it.count > 0n).map((it, idx) => (
+              <ItemCard key={idx} name={it.name} count={it.count} game={it.game} />
             ))}
-            {Object.entries(HARVEST_ITEMS).map(([id, name]) => (
-              <ItemCard key={`h-${id}`} name={name} count={harvestItems[Number(id)] ?? 0n} game="Harvest" />
-            ))}
+            {allItems.every(it => it.count === 0n) && (
+              <p className="col-span-full text-center text-surface-400 text-sm py-4">No items yet. Play games to earn items!</p>
+            )}
           </div>
         )}
       </div>

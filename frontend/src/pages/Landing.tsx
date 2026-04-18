@@ -58,8 +58,8 @@ const ARCH_STEPS = [
 ]
 
 const STATS = [
-  { label: 'Contracts', value: '17' },
-  { label: 'Game Tokens', value: '3' },
+  { label: 'Contracts', value: '19' },
+  { label: 'Game Tokens', value: '3+' },
   { label: 'Token Standards', value: '4' },
   { label: 'Chain', value: 'MiniEVM' },
 ]
@@ -117,16 +117,16 @@ export default function Landing() {
           </div>
 
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-            <span className="text-surface-900">Cross-Game</span>
+            <span className="text-surface-900">One Economy.</span>
             <br />
             <span className="text-gradient bg-gradient-to-r from-brand-600 via-violet-600 to-emerald-500">
-              Player Economy
+              Every Game.
             </span>
           </h1>
 
           <p className="text-lg sm:text-xl text-surface-500 max-w-2xl mx-auto mb-10 leading-relaxed animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-            One identity. One wallet. Every game. Earn items, trade on a shared marketplace,
-            and never worry about gas tokens.
+            Open gaming infrastructure on Initia. Any game registers, gets tokens, items, DEX liquidity,
+            marketplace access, and gas abstraction — automatically.
           </p>
 
           <div className="flex items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '300ms' }}>
@@ -206,9 +206,9 @@ export default function Landing() {
       <section className="max-w-5xl mx-auto px-6 pb-24">
         <h2 className="text-2xl font-bold text-center text-surface-900 mb-2">Live Games</h2>
         <p className="text-center text-surface-500 mb-10 text-sm">
-          Two fully playable games demonstrating cross-game economy
+          Three demo games demonstrating the shared infrastructure
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="rounded-2xl overflow-hidden border border-surface-200 hover:shadow-lg transition-all duration-300 group">
             <div className="dungeon-gradient p-8 text-center">
               <span className="text-5xl block mb-3">⚔️</span>
@@ -216,7 +216,7 @@ export default function Landing() {
               <p className="text-white/60 text-sm mt-1">Loot-based dungeon crawler</p>
             </div>
             <div className="p-5 bg-white">
-              <p className="text-surface-500 text-sm">Pay DNGN to enter dungeons, roll for rare items. Equipment grants passive bonuses. Gas paid via Paymaster.</p>
+              <p className="text-surface-500 text-sm">Pay DNGN to enter dungeons, roll for rare items. Gas paid via Paymaster.</p>
             </div>
           </div>
           <div className="rounded-2xl overflow-hidden border border-surface-200 hover:shadow-lg transition-all duration-300 group">
@@ -226,7 +226,17 @@ export default function Landing() {
               <p className="text-white/60 text-sm mt-1">Farming & staking simulator</p>
             </div>
             <div className="p-5 bg-white">
-              <p className="text-surface-500 text-sm">Stake HRV tokens, wait for harvest cycle, collect yield. Seasonal items boost rewards. Gas paid via Paymaster.</p>
+              <p className="text-surface-500 text-sm">Stake HRV tokens, wait for harvest cycle, collect seasonal yield.</p>
+            </div>
+          </div>
+          <div className="rounded-2xl overflow-hidden border border-surface-200 hover:shadow-lg transition-all duration-300 group">
+            <div className="bg-gradient-to-br from-orange-600 to-red-600 p-8 text-center">
+              <span className="text-5xl block mb-3">🏎️</span>
+              <h3 className="text-white font-bold text-xl">Cosmic Racer</h3>
+              <p className="text-white/60 text-sm mt-1">Racing game (3rd-party demo)</p>
+            </div>
+            <div className="p-5 bg-white">
+              <p className="text-surface-500 text-sm">Registered via <code className="text-xs bg-surface-100 px-1 rounded">registerGameWithFee()</code> — proving permissionless onboarding.</p>
             </div>
           </div>
         </div>
@@ -235,7 +245,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-surface-200 py-8 text-center">
         <p className="text-surface-400 text-xs">PixelVault — Built for Initia Hackathon</p>
-        <p className="text-surface-300 text-[10px] mt-1">17 smart contracts · MiniEVM · IBC · ERC-6551</p>
+        <p className="text-surface-300 text-[10px] mt-1">19 smart contracts · MiniEVM · IBC · ERC-6551 · Permissionless game registration</p>
       </footer>
     </div>
   )

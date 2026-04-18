@@ -15,7 +15,7 @@ const DEX = lazy(() => import('./pages/DEX'))
 const Marketplace = lazy(() => import('./pages/Marketplace'))
 const GasSettings = lazy(() => import('./pages/GasSettings'))
 const GameHub = lazy(() => import('./pages/GameHub'))
-const SDKDocs = lazy(() => import('./pages/SDKDocs'))
+const HowItWorks = lazy(() => import('./pages/SDKDocs'))
 const Bridge = lazy(() => import('./pages/Bridge'))
 
 function PageLoader() {
@@ -51,7 +51,8 @@ export default function App() {
         <Route path="/marketplace" element={<ProtectedPage><Marketplace /></ProtectedPage>} />
         <Route path="/gas" element={<ProtectedPage><GasSettings /></ProtectedPage>} />
         <Route path="/games" element={<ProtectedPage><GameHub /></ProtectedPage>} />
-        <Route path="/sdk" element={<ProtectedPage><SDKDocs /></ProtectedPage>} />
+        <Route path="/how-it-works" element={<ProtectedPage><HowItWorks /></ProtectedPage>} />
+        <Route path="/sdk" element={<Navigate to="/how-it-works" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

@@ -2,22 +2,9 @@ import { useState, useEffect } from 'react'
 import { formatEther, parseAbiItem } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
-import { GAME_IDS } from '../lib/constants'
 import toast from 'react-hot-toast'
 
-const getTokenName = (address: string, contracts: any) => {
-  if (address.toLowerCase() === contracts.dungeonDropsToken.address.toLowerCase()) return 'DNGN'
-  if (address.toLowerCase() === contracts.harvestFieldToken.address.toLowerCase()) return 'HRV'
-  if (address.toLowerCase() === contracts.pxlToken.address.toLowerCase()) return 'PXL'
-  return 'Unknown'
-}
-const getContractName = (address: string, contracts: any) => {
-  if (address.toLowerCase() === contracts.marketplace.address.toLowerCase()) return 'Marketplace'
-  if (address.toLowerCase() === contracts.dungeonDrops.address.toLowerCase()) return 'Dungeon Drops'
-  if (address.toLowerCase() === contracts.harvestField.address.toLowerCase()) return 'Harvest Field'
-  if (address.toLowerCase() === contracts.gameRegistry.address.toLowerCase()) return 'Game Registry'
-  return 'Unknown'
-}
+interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}` }
 
 type GasRecord = { txHash: string; targetName: string; tokenName: string; tokensProvided: bigint; pxlEquivalent: bigint; success: boolean }
 
@@ -25,20 +12,39 @@ export default function GasSettings() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
   const [isLoading, setIsLoading] = useState(true)
+  const [games, setGames] = useState<RegisteredGame[]>([])
   const [gasHistory, setGasHistory] = useState<GasRecord[]>([])
-  const [rates, setRates] = useState<{ dngn: bigint; hrv: bigint }>({ dngn: 0n, hrv: 0n })
-
-  const dungeonPaymaster = (() => { try { return localStorage.getItem('pv-gas-dungeon') !== 'off' } catch { return true } })()
-  const harvestPaymaster = (() => { try { return localStorage.getItem('pv-gas-harvest') !== 'off' } catch { return true } })()
+  const [rates, setRates] = useState<Record<string, bigint>>({})
 
   useEffect(() => {
     if (!tba) return
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        const dngnRate = await publicClient.readContract({ address: contracts.dex.address, abi: contracts.dex.abi, functionName: 'getAmountIn', args: [GAME_IDS.DUNGEON, 10n ** 18n] }).catch(() => 0n)
-        const hrvRate = await publicClient.readContract({ address: contracts.dex.address, abi: contracts.dex.abi, functionName: 'getAmountIn', args: [GAME_IDS.HARVEST, 10n ** 18n] }).catch(() => 0n)
-        setRates({ dngn: dngnRate as bigint, hrv: hrvRate as bigint })
+        // Fetch games from registry
+        const countRaw = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameCount' })
+        const count = Number(countRaw)
+        const fetchedGames: RegisteredGame[] = []
+        const tokenMap = new Map<string, string>() // address -> symbol
+        for (let i = 0; i < count; i++) {
+          const gameId = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'gameIds', args: [BigInt(i)] }) as `0x${string}`
+          const data = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'games', args: [gameId] }) as any
+          if (data[8] === true) {
+            fetchedGames.push({ gameId, name: data[3], symbol: data[4], tokenAddress: data[0] })
+            tokenMap.set(data[0].toLowerCase(), data[4])
+          }
+        }
+        setGames(fetchedGames)
+
+        // Fetch exchange rates for each game
+        const newRates: Record<string, bigint> = {}
+        for (const game of fetchedGames) {
+          const rate = await publicClient.readContract({ address: contracts.dex.address, abi: contracts.dex.abi, functionName: 'getAmountIn', args: [game.gameId, 10n ** 18n] }).catch(() => 0n) as bigint
+          newRates[game.symbol] = rate
+        }
+        setRates(newRates)
+
+        // Gas history
         const logs = await publicClient.getLogs({
           address: contracts.gasPaymaster.address,
           event: parseAbiItem('event GasSponsored(address indexed playerTBA, address indexed gameToken, uint256 tokensProvided, uint256 pxlReceived, address target, bool success)'),
@@ -47,8 +53,8 @@ export default function GasSettings() {
         })
         const records: GasRecord[] = logs.map((log: any) => ({
           txHash: log.transactionHash,
-          targetName: getContractName(log.args.target, contracts),
-          tokenName: getTokenName(log.args.gameToken, contracts),
+          targetName: (log.args.target as string)?.slice(0, 10) + '…',
+          tokenName: tokenMap.get(log.args.gameToken?.toLowerCase()) ?? 'Unknown',
           tokensProvided: log.args.tokensProvided ?? 0n,
           pxlEquivalent: log.args.pxlReceived ?? 0n,
           success: log.args.success ?? false,
@@ -72,26 +78,17 @@ export default function GasSettings() {
       {/* Active Status */}
       <div className="card p-5 space-y-3">
         <h2 className="section-title">GasPaymaster Status</h2>
-        <p className="text-xs text-surface-400">Each game page has its own toggle. Status shown below.</p>
+        <p className="text-xs text-surface-400">Supports {games.length} game tokens. Each game page has its own toggle.</p>
         <div className="space-y-2">
-          <div className="flex items-center justify-between bg-surface-50 rounded-xl p-3 border border-surface-100">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${dungeonPaymaster ? 'bg-emerald-500' : 'bg-surface-300'}`} />
-              <span className="text-sm font-medium text-surface-700">Dungeon Drops</span>
+          {games.map(g => (
+            <div key={g.symbol} className="flex items-center justify-between bg-surface-50 rounded-xl p-3 border border-surface-100">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-sm font-medium text-surface-700">{g.name}</span>
+              </div>
+              <span className="text-xs font-medium text-emerald-600">Pays gas in {g.symbol}</span>
             </div>
-            <span className={`text-xs font-medium ${dungeonPaymaster ? 'text-emerald-600' : 'text-surface-400'}`}>
-              {dungeonPaymaster ? 'Paying gas in DNGN' : 'Native gas'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between bg-surface-50 rounded-xl p-3 border border-surface-100">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${harvestPaymaster ? 'bg-emerald-500' : 'bg-surface-300'}`} />
-              <span className="text-sm font-medium text-surface-700">Harvest Field</span>
-            </div>
-            <span className={`text-xs font-medium ${harvestPaymaster ? 'text-emerald-600' : 'text-surface-400'}`}>
-              {harvestPaymaster ? 'Paying gas in HRV' : 'Native gas'}
-            </span>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -110,15 +107,13 @@ export default function GasSettings() {
       {/* Exchange Rates */}
       <div className="card p-5 space-y-3">
         <h2 className="section-title">Exchange Rates</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-surface-50 rounded-xl p-3 border border-surface-100">
-            <p className="stat-label mb-1">1 PXL costs</p>
-            <p className="font-bold text-violet-600">{rates.dngn > 0n ? formatEther(rates.dngn) : '—'} DNGN</p>
-          </div>
-          <div className="bg-surface-50 rounded-xl p-3 border border-surface-100">
-            <p className="stat-label mb-1">1 PXL costs</p>
-            <p className="font-bold text-emerald-600">{rates.hrv > 0n ? formatEther(rates.hrv) : '—'} HRV</p>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {games.map(g => (
+            <div key={g.symbol} className="bg-surface-50 rounded-xl p-3 border border-surface-100">
+              <p className="stat-label mb-1">1 PXL costs</p>
+              <p className="font-bold text-surface-700">{rates[g.symbol] && rates[g.symbol] > 0n ? formatEther(rates[g.symbol]) : '—'} {g.symbol}</p>
+            </div>
+          ))}
         </div>
       </div>
 

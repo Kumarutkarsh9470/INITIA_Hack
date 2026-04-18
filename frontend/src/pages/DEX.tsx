@@ -3,13 +3,14 @@ import { formatEther, parseEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
-import { GAME_IDS, DUNGEON_ITEMS, DUNGEON_EXPECTED_COST, DUNGEON_DROP_RATES } from '../lib/constants'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-type GameToken = 'DNGN' | 'HRV'
+
 type SwapDirection = 'pxlToGame' | 'gameToPxl'
 type Tab = 'swap' | 'liquidity' | 'economics'
 interface PoolInfo { reservePXL: bigint; reserveGame: bigint; price: bigint }
+interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}`; assetCollection: `0x${string}` }
+
 function fmt(val: bigint, decimals = 4): string {
   return parseFloat(formatEther(val)).toFixed(decimals)
 }
@@ -21,128 +22,129 @@ function ammEstimate(amtIn: bigint, reserveIn: bigint, reserveOut: bigint): bigi
   const amtInWithFee = amtIn * 997n
   return (amtInWithFee * reserveOut) / (reserveIn * 1000n + amtInWithFee)
 }
-const TOKEN_COLORS: Record<string, string> = { PXL: 'text-brand-600', DNGN: 'text-violet-600', HRV: 'text-emerald-600' }
+
+const TOKEN_COLORS: Record<string, string> = { PXL: 'text-brand-600', DNGN: 'text-violet-600', HRV: 'text-emerald-600', RACE: 'text-orange-600' }
 const SLIPPAGE_BPS = 50n
+
 export default function DEX() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
   const { execute, isPending } = useTBA()
 
+  const [games, setGames] = useState<RegisteredGame[]>([])
   const [pxlBalance, setPxlBalance] = useState(0n)
-  const [dngnBalance, setDngnBalance] = useState(0n)
-  const [hrvBalance, setHrvBalance] = useState(0n)
-  const [pools, setPools] = useState<Record<GameToken, PoolInfo>>({
-    DNGN: { reservePXL: 0n, reserveGame: 0n, price: 0n },
-    HRV: { reservePXL: 0n, reserveGame: 0n, price: 0n },
-  })
-  const [lpBalances, setLpBalances] = useState<Record<GameToken, bigint>>({ DNGN: 0n, HRV: 0n })
-  const [ratings, setRatings] = useState<Record<GameToken, bigint>>({ DNGN: 100n, HRV: 100n })
-  const [selectedGame, setSelectedGame] = useState<GameToken>('DNGN')
+  const [balances, setBalances] = useState<Record<string, bigint>>({})
+  const [pools, setPools] = useState<Record<string, PoolInfo>>({})
+  const [lpBalances, setLpBalances] = useState<Record<string, bigint>>({})
+  const [ratings, setRatings] = useState<Record<string, bigint>>({})
+  const [selectedSymbol, setSelectedSymbol] = useState('')
   const [direction, setDirection] = useState<SwapDirection>('pxlToGame')
   const [inputAmount, setInputAmount] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('swap')
   const [lpPxlAmount, setLpPxlAmount] = useState('')
-  const [lpGameAmount, setLpGameAmount] = useState('')
   const [lpShareAmount, setLpShareAmount] = useState('')
 
-  const pool = pools[selectedGame]
+  const selectedGame = games.find(g => g.symbol === selectedSymbol)
+  const pool = selectedSymbol ? pools[selectedSymbol] ?? { reservePXL: 0n, reserveGame: 0n, price: 0n } : { reservePXL: 0n, reserveGame: 0n, price: 0n }
   const parsedIn = safeParse(inputAmount)
   const estimatedOut = direction === 'pxlToGame'
     ? ammEstimate(parsedIn, pool.reservePXL, pool.reserveGame)
     : ammEstimate(parsedIn, pool.reserveGame, pool.reservePXL)
   const minOut = estimatedOut === 0n ? 0n : estimatedOut - (estimatedOut * SLIPPAGE_BPS / 10000n)
-  const inToken = direction === 'pxlToGame' ? 'PXL' : selectedGame
-  const outToken = direction === 'pxlToGame' ? selectedGame : 'PXL'
-  const inBalance = direction === 'pxlToGame' ? pxlBalance : selectedGame === 'DNGN' ? dngnBalance : hrvBalance
+  const inToken = direction === 'pxlToGame' ? 'PXL' : selectedSymbol
+  const outToken = direction === 'pxlToGame' ? selectedSymbol : 'PXL'
+  const inBalance = direction === 'pxlToGame' ? pxlBalance : (balances[selectedSymbol] ?? 0n)
 
   const fetchAll = useCallback(async () => {
     if (!tba) return
     setIsLoading(true)
     try {
-      const [pxl, dngn, hrv] = await Promise.all([
-        publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
-        publicClient.readContract({ address: contracts.dungeonDropsToken.address, abi: contracts.dungeonDropsToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
-        publicClient.readContract({ address: contracts.harvestFieldToken.address, abi: contracts.harvestFieldToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
-      ])
-      setPxlBalance(pxl); setDngnBalance(dngn); setHrvBalance(hrv)
-      const fetchPool = async (game: GameToken): Promise<PoolInfo> => {
-        const gameId = GAME_IDS[game]
-        const [poolData, price] = await Promise.all([
-          publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [gameId] }),
-          publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'getPrice', args: [gameId] }) as Promise<bigint>,
+      const countRaw = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameCount' })
+      const count = Number(countRaw)
+      const fetchedGames: RegisteredGame[] = []
+      for (let i = 0; i < count; i++) {
+        const gameId = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'gameIds', args: [BigInt(i)] }) as `0x${string}`
+        const data = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'games', args: [gameId] }) as any
+        if (data[8] === true) {
+          fetchedGames.push({ gameId, name: data[3], symbol: data[4], tokenAddress: data[0], assetCollection: data[1] })
+        }
+      }
+      setGames(fetchedGames)
+      if (fetchedGames.length > 0 && !selectedSymbol) setSelectedSymbol(fetchedGames[0].symbol)
+
+      const pxl = await publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as bigint
+      setPxlBalance(pxl)
+
+      const newBalances: Record<string, bigint> = {}
+      const newPools: Record<string, PoolInfo> = {}
+      const newLp: Record<string, bigint> = {}
+      const newRatings: Record<string, bigint> = {}
+
+      for (const game of fetchedGames) {
+        const [bal, poolData, price, lp, rating] = await Promise.all([
+          publicClient.readContract({ address: game.tokenAddress, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
+          publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [game.gameId] }),
+          publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'getPrice', args: [game.gameId] }).catch(() => 0n) as Promise<bigint>,
+          publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'lpShares', args: [game.gameId, tba] }).catch(() => 0n) as Promise<bigint>,
+          publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [game.gameId] }).catch(() => 100n) as Promise<bigint>,
         ])
         const arr = poolData as unknown as [string, bigint, bigint, string, boolean, bigint]
-        return { reservePXL: arr[1], reserveGame: arr[2], price }
+        newBalances[game.symbol] = bal
+        newPools[game.symbol] = { reservePXL: arr[1], reserveGame: arr[2], price }
+        newLp[game.symbol] = lp
+        newRatings[game.symbol] = rating
       }
-      const [dngnPool, hrvPool] = await Promise.all([fetchPool('DNGN'), fetchPool('HRV')])
-      setPools({ DNGN: dngnPool, HRV: hrvPool })
-      const [dngnLp, hrvLp] = await Promise.all([
-        publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'lpShares', args: [GAME_IDS.DNGN, tba] }) as Promise<bigint>,
-        publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'lpShares', args: [GAME_IDS.HRV, tba] }) as Promise<bigint>,
-      ])
-      setLpBalances({ DNGN: dngnLp, HRV: hrvLp })
-      // Fetch game ratings
-      const [dngnRating, hrvRating] = await Promise.all([
-        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.DUNGEON] }) as Promise<bigint>,
-        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.HARVEST] }) as Promise<bigint>,
-      ])
-      setRatings({ DNGN: dngnRating, HRV: hrvRating })
+      setBalances(newBalances); setPools(newPools); setLpBalances(newLp); setRatings(newRatings)
     } catch (err) {
       console.error('DEX fetch error:', err)
       toast.error('Failed to load DEX data')
     } finally { setIsLoading(false) }
-  }, [tba, contracts])
+  }, [tba, contracts, selectedSymbol])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
   async function handleSwap() {
-    if (!tba || parsedIn === 0n) return
+    if (!tba || parsedIn === 0n || !selectedGame) return
     if (parsedIn > inBalance) return toast.error(`Insufficient ${inToken} balance`)
-    const gameId = GAME_IDS[selectedGame]
-    const inTokenContract = direction === 'pxlToGame' ? contracts.pxlToken : selectedGame === 'DNGN' ? contracts.dungeonDropsToken : contracts.harvestFieldToken
+    const tokenAddr = direction === 'pxlToGame' ? contracts.pxlToken.address : selectedGame.tokenAddress
     try {
-      await execute(inTokenContract.address, 0n,
-        encodeFunctionData({ abi: inTokenContract.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, parsedIn] }))
+      await execute(tokenAddr, 0n,
+        encodeFunctionData({ abi: contracts.pxlToken.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, parsedIn] }))
       const swapFn = direction === 'pxlToGame' ? 'swapPXLForGame' : 'swapGameForPXL'
       await execute(contracts.pixelVaultDEX.address, 0n,
-        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: swapFn, args: [gameId, parsedIn, minOut] }))
+        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: swapFn, args: [selectedGame.gameId, parsedIn, minOut] }))
       toast.success(`Swapped ${inputAmount} ${inToken} → ${fmt(estimatedOut)} ${outToken}`)
       setInputAmount(''); await fetchAll()
     } catch (err: any) { toast.error(err?.message ?? 'Swap failed') }
   }
 
   async function handleAddLiquidity() {
-    if (!tba) return
+    if (!tba || !selectedGame) return
     const pxlAmt = safeParse(lpPxlAmount)
     if (pxlAmt === 0n) return toast.error('Enter PXL amount')
-    const { reservePXL, reserveGame } = pools[selectedGame]
+    const { reservePXL, reserveGame } = pool
     if (reservePXL === 0n) return toast.error('Pool not initialized')
-    // Contract calculates: gameAmount = (pxlAmount * reserveGame) / reservePXL
     const gameAmtNeeded = (pxlAmt * reserveGame) / reservePXL
-    // Add 0.5% slippage buffer for maxGameAmount
     const maxGameAmt = gameAmtNeeded + (gameAmtNeeded * SLIPPAGE_BPS / 10000n)
-    const gameId = GAME_IDS[selectedGame]
-    const gameTokenContract = selectedGame === 'DNGN' ? contracts.dungeonDropsToken : contracts.harvestFieldToken
     try {
       await execute(contracts.pxlToken.address, 0n,
         encodeFunctionData({ abi: contracts.pxlToken.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, pxlAmt] }))
-      await execute(gameTokenContract.address, 0n,
-        encodeFunctionData({ abi: gameTokenContract.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, maxGameAmt] }))
+      await execute(selectedGame.tokenAddress, 0n,
+        encodeFunctionData({ abi: contracts.pxlToken.abi, functionName: 'approve', args: [contracts.pixelVaultDEX.address, maxGameAmt] }))
       await execute(contracts.pixelVaultDEX.address, 0n,
-        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: 'addLiquidity', args: [gameId, pxlAmt, maxGameAmt] }))
+        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: 'addLiquidity', args: [selectedGame.gameId, pxlAmt, maxGameAmt] }))
       toast.success('Liquidity added!'); setLpPxlAmount(''); await fetchAll()
     } catch (err: any) { toast.error(err?.message ?? 'Add liquidity failed') }
   }
 
   async function handleRemoveLiquidity() {
-    if (!tba) return
+    if (!tba || !selectedGame) return
     const shareAmt = safeParse(lpShareAmount)
     if (shareAmt === 0n) return toast.error('Enter share amount')
-    const gameId = GAME_IDS[selectedGame]
     try {
       await execute(contracts.pixelVaultDEX.address, 0n,
-        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: 'removeLiquidity', args: [gameId, shareAmt] }))
+        encodeFunctionData({ abi: contracts.pixelVaultDEX.abi, functionName: 'removeLiquidity', args: [selectedGame.gameId, shareAmt] }))
       toast.success('Liquidity removed!'); setLpShareAmount(''); await fetchAll()
     } catch (err: any) { toast.error(err?.message ?? 'Remove liquidity failed') }
   }
@@ -162,27 +164,25 @@ export default function DEX() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">PixelVault DEX</h1>
-          <p className="text-surface-500 text-sm mt-0.5">Swap tokens · Add liquidity · Bridge</p>
+          <p className="text-surface-500 text-sm mt-0.5">{games.length} game tokens · Swap · Liquidity</p>
         </div>
-        <Link to="/bridge"
-          className="btn-secondary text-sm px-3 py-1.5 inline-block">
-          IBC Bridge
-        </Link>
+        <Link to="/bridge" className="btn-secondary text-sm px-3 py-1.5 inline-block">IBC Bridge</Link>
       </div>
 
       {/* Balances */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'PXL', val: pxlBalance, color: 'text-brand-600' },
-          { label: 'DNGN', val: dngnBalance, color: 'text-violet-600' },
-          { label: 'HRV', val: hrvBalance, color: 'text-emerald-600' },
-        ].map(({ label, val, color }) => (
-          <div key={label} className="card px-3 py-2 text-center">
-            <p className="stat-label">{label}</p>
-            <p className={`text-sm font-semibold mt-0.5 ${color}`}>{fmt(val)}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="card px-3 py-2 text-center">
+          <p className="stat-label">PXL</p>
+          <p className="text-sm font-semibold mt-0.5 text-brand-600">{fmt(pxlBalance)}</p>
+        </div>
+        {games.map(g => (
+          <div key={g.symbol} className="card px-3 py-2 text-center">
+            <p className="stat-label">{g.symbol}</p>
+            <p className={`text-sm font-semibold mt-0.5 ${TOKEN_COLORS[g.symbol] ?? 'text-surface-700'}`}>{fmt(balances[g.symbol] ?? 0n)}</p>
           </div>
         ))}
       </div>
+
       {/* Tabs */}
       <div className="flex bg-surface-100 rounded-xl p-1 gap-1">
         {(['swap', 'liquidity', 'economics'] as Tab[]).map(t => (
@@ -194,26 +194,27 @@ export default function DEX() {
         ))}
       </div>
 
-      {/* SWAP TAB */}
-      {tab === 'swap' && (
-        <div className="card p-5 space-y-4">
-          {/* Token pair selector */}
-          <div className="flex gap-2">
-            {(['DNGN', 'HRV'] as GameToken[]).map(g => (
-              <button key={g} onClick={() => { setSelectedGame(g); setInputAmount('') }}
-                className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors
-                  ${selectedGame === g
-                    ? 'bg-brand-50 border-brand-200 text-brand-700'
-                    : 'bg-surface-50 border-surface-200 text-surface-500 hover:text-surface-700'}`}>
-                {g}
-              </button>
-            ))}
-          </div>
+      {/* Token selector — shared across tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {games.map(g => (
+          <button key={g.symbol} onClick={() => { setSelectedSymbol(g.symbol); setInputAmount('') }}
+            className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors
+              ${selectedSymbol === g.symbol
+                ? 'bg-brand-50 border-brand-200 text-brand-700'
+                : 'bg-surface-50 border-surface-200 text-surface-500 hover:text-surface-700'}`}>
+            {g.symbol}
+            <span className="ml-1.5 text-xs opacity-50">{g.name}</span>
+          </button>
+        ))}
+      </div>
 
+      {/* SWAP TAB */}
+      {tab === 'swap' && selectedSymbol && (
+        <div className="card p-5 space-y-4">
           {/* Direction */}
           <div className="flex items-center gap-3">
             <div className="flex-1 text-center">
-              <span className={`text-sm font-semibold ${TOKEN_COLORS[inToken]}`}>{inToken}</span>
+              <span className={`text-sm font-semibold ${TOKEN_COLORS[inToken] ?? 'text-surface-700'}`}>{inToken}</span>
             </div>
             <button onClick={() => { setDirection(d => d === 'pxlToGame' ? 'gameToPxl' : 'pxlToGame'); setInputAmount('') }}
               className="bg-surface-100 hover:bg-surface-200 border border-surface-200 rounded-full w-9 h-9 flex items-center justify-center text-surface-500 transition-colors">
@@ -222,7 +223,7 @@ export default function DEX() {
               </svg>
             </button>
             <div className="flex-1 text-center">
-              <span className={`text-sm font-semibold ${TOKEN_COLORS[outToken]}`}>{outToken}</span>
+              <span className={`text-sm font-semibold ${TOKEN_COLORS[outToken] ?? 'text-surface-700'}`}>{outToken}</span>
             </div>
           </div>
 
@@ -247,7 +248,7 @@ export default function DEX() {
           <div className="bg-surface-50 border border-surface-200 rounded-xl p-4 space-y-1.5">
             <div className="flex justify-between items-center">
               <span className="text-surface-500 text-sm">You receive (est.)</span>
-              <span className={`text-lg font-bold ${TOKEN_COLORS[outToken]}`}>
+              <span className={`text-lg font-bold ${TOKEN_COLORS[outToken] ?? 'text-surface-700'}`}>
                 {parsedIn > 0n ? fmt(estimatedOut) : '—'} {outToken}
               </span>
             </div>
@@ -259,7 +260,7 @@ export default function DEX() {
                 </div>
                 <div className="flex justify-between text-xs text-surface-400">
                   <span>Spot price</span>
-                  <span>1 {selectedGame} = {fmt(pool.price)} PXL</span>
+                  <span>1 {selectedSymbol} = {fmt(pool.price)} PXL</span>
                 </div>
               </>
             )}
@@ -272,31 +273,20 @@ export default function DEX() {
           </button>
         </div>
       )}
+
       {/* LIQUIDITY TAB */}
-      {tab === 'liquidity' && (
+      {tab === 'liquidity' && selectedSymbol && (
         <div className="space-y-4">
-          <div className="flex gap-2">
-            {(['DNGN', 'HRV'] as GameToken[]).map(g => (
-              <button key={g} onClick={() => setSelectedGame(g)}
-                className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors
-                  ${selectedGame === g
-                    ? 'bg-brand-50 border-brand-200 text-brand-700'
-                    : 'bg-surface-50 border-surface-200 text-surface-500 hover:text-surface-700'}`}>
-                {g}
-              </button>
-            ))}
-          </div>
-          {/* Add */}
           <div className="card p-5 space-y-4">
             <h3 className="section-title text-sm">Add Liquidity</h3>
             <LpInput label="PXL Amount" value={lpPxlAmount} onChange={setLpPxlAmount} balance={pxlBalance} token="PXL" />
             {(() => {
               const pxlAmt = safeParse(lpPxlAmount)
-              const { reservePXL, reserveGame } = pools[selectedGame]
+              const { reservePXL, reserveGame } = pool
               const gameNeeded = reservePXL > 0n ? (pxlAmt * reserveGame) / reservePXL : 0n
               return pxlAmt > 0n && gameNeeded > 0n ? (
                 <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-sm">
-                  <span className="text-surface-500">{selectedGame} needed: </span>
+                  <span className="text-surface-500">{selectedSymbol} needed: </span>
                   <span className="font-semibold">{fmt(gameNeeded)}</span>
                   <span className="text-surface-400 text-xs ml-1">(auto-calculated from pool ratio)</span>
                 </div>
@@ -307,16 +297,15 @@ export default function DEX() {
               {isPending ? 'Processing…' : 'Add Liquidity'}
             </button>
           </div>
-          {/* Remove */}
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="section-title text-sm">Remove Liquidity</h3>
               <span className="text-xs text-surface-400">
-                LP shares: <span className="text-surface-700 font-mono">{fmt(lpBalances[selectedGame])}</span>
+                LP shares: <span className="text-surface-700 font-mono">{fmt(lpBalances[selectedSymbol] ?? 0n)}</span>
               </span>
             </div>
             <LpInput label="LP Share Amount" value={lpShareAmount} onChange={setLpShareAmount}
-              balance={lpBalances[selectedGame]} token="shares" />
+              balance={lpBalances[selectedSymbol] ?? 0n} token="shares" />
             <button onClick={handleRemoveLiquidity} disabled={isPending}
               className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-3 rounded-xl transition-colors disabled:opacity-50">
               {isPending ? 'Processing…' : 'Remove Liquidity'}
@@ -324,81 +313,59 @@ export default function DEX() {
           </div>
         </div>
       )}
+
       {/* ECONOMICS TAB */}
       {tab === 'economics' && (
         <div className="space-y-4">
-          {/* Item price table */}
-          <div className="card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="section-title text-sm">Item Floor Prices</h3>
-              <span className="text-xs text-surface-400">Rating: {(Number(ratings.DNGN) / 100).toFixed(1)}★</span>
-            </div>
-            <div className="space-y-2">
-              {([1, 2, 3] as const).map(itemId => {
-                const costDNGN = DUNGEON_EXPECTED_COST[itemId]
-                const dropRate = DUNGEON_DROP_RATES[itemId]
-                const { reservePXL, reserveGame } = pools.DNGN
-                const basePXL = (reservePXL > 0n && reserveGame > 0n)
-                  ? ammEstimate(costDNGN, reserveGame, reservePXL) : 0n
-                const floorPXL = basePXL * ratings.DNGN / 100n
-                return (
-                  <div key={itemId} className="flex items-center justify-between bg-surface-50 rounded-xl px-4 py-3 border border-surface-100">
-                    <div>
-                      <p className="text-sm font-semibold text-surface-800">{DUNGEON_ITEMS[itemId]}</p>
-                      <p className="text-xs text-surface-400">{dropRate}% drop · {parseFloat(formatEther(costDNGN)).toFixed(1)} DNGN cost</p>
-                    </div>
-                    <p className="text-sm font-bold font-mono text-surface-900">
-                      {floorPXL > 0n ? parseFloat(formatEther(floorPXL)).toFixed(2) : '—'} <span className="text-surface-400 font-normal">PXL</span>
-                    </p>
-                  </div>
-                )
-              })}
-              {/* Harvest item */}
-              <div className="flex items-center justify-between bg-surface-50 rounded-xl px-4 py-3 border border-surface-100">
-                <div>
-                  <p className="text-sm font-semibold text-surface-800">Seasonal Harvest Item</p>
-                  <p className="text-xs text-surface-400">Guaranteed · Staking byproduct</p>
+          <div className="card p-4">
+            <p className="stat-label text-center mb-3">Cross-Game Token Flow</p>
+            <div className="flex items-center justify-center gap-2 text-sm flex-wrap">
+              {games.map((g, i) => (
+                <div key={g.symbol} className="flex items-center gap-2">
+                  <span className={`px-3 py-1.5 rounded-lg border border-surface-200 font-medium ${TOKEN_COLORS[g.symbol] ?? 'text-surface-700'}`}>{g.symbol}</span>
+                  {i < games.length - 1 && (
+                    <>
+                      <span className="text-surface-300">↔</span>
+                      <span className="px-2 py-1 rounded-lg border border-surface-200 font-bold text-brand-600 text-xs">PXL</span>
+                      <span className="text-surface-300">↔</span>
+                    </>
+                  )}
                 </div>
-                <p className="text-sm font-bold font-mono text-surface-900">
-                  {(() => {
-                    const { reservePXL, reserveGame } = pools.HRV
-                    if (reservePXL === 0n || reserveGame === 0n) return '—'
-                    const basePXL = ammEstimate(1000000000000000000n, reserveGame, reservePXL)
-                    return parseFloat(formatEther(basePXL * ratings.HRV / 100n)).toFixed(2)
-                  })()} <span className="text-surface-400 font-normal">PXL</span>
-                </p>
+              ))}
+            </div>
+            <p className="text-xs text-surface-400 text-center mt-2">Every game token routes through PXL — enabling cross-game value transfer</p>
+          </div>
+          {games.map(g => (
+            <div key={g.symbol} className="card p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-surface-700">{g.name} ({g.symbol})</span>
+                <span className="text-xs text-surface-400">Rating: {(Number(ratings[g.symbol] ?? 100n) / 100).toFixed(1)}★</span>
               </div>
             </div>
-          </div>
-          {/* Cross-game flow — visual only */}
-          <div className="card p-4">
-            <div className="flex items-center justify-center gap-2 text-sm">
-              <span className="px-3 py-1.5 rounded-lg border border-surface-200 font-medium text-surface-700">DNGN Items</span>
-              <span className="text-surface-300">→</span>
-              <span className="px-3 py-1.5 rounded-lg border border-surface-200 font-bold text-surface-900">PXL</span>
-              <span className="text-surface-300">→</span>
-              <span className="px-3 py-1.5 rounded-lg border border-surface-200 font-medium text-surface-700">HRV Items</span>
-            </div>
-          </div>
+          ))}
         </div>
       )}
+
       {/* Pool Reserves */}
       <div className="card p-5 space-y-4">
-        <h2 className="section-title text-sm">Pool Reserves</h2>
+        <h2 className="section-title text-sm">Pool Reserves — {games.length} Active Pools</h2>
         <div className="space-y-3">
-          {(['DNGN', 'HRV'] as GameToken[]).map(g => {
-            const p = pools[g]
+          {games.map(g => {
+            const p = pools[g.symbol] ?? { reservePXL: 0n, reserveGame: 0n, price: 0n }
             return (
-              <div key={g} className="bg-surface-50 rounded-xl p-4 border border-surface-100 space-y-2">
-                <p className="text-sm font-semibold text-surface-700">PXL / {g}</p>
+              <div key={g.symbol} className="bg-surface-50 rounded-xl p-4 border border-surface-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-surface-700">PXL / {g.symbol}</p>
+                  <span className="text-xs text-surface-400">{g.name}</span>
+                </div>
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div>
                     <p className="stat-label">PXL Reserve</p>
                     <p className="font-mono font-medium text-brand-600">{fmt(p.reservePXL)}</p>
                   </div>
                   <div>
-                    <p className="stat-label">{g} Reserve</p>
-                    <p className={`font-mono font-medium ${TOKEN_COLORS[g]}`}>{fmt(p.reserveGame)}</p>
+                    <p className="stat-label">{g.symbol} Reserve</p>
+                    <p className={`font-mono font-medium ${TOKEN_COLORS[g.symbol] ?? 'text-surface-700'}`}>{fmt(p.reserveGame)}</p>
                   </div>
                   <div>
                     <p className="stat-label">Spot Price</p>
@@ -413,6 +380,7 @@ export default function DEX() {
     </div>
   )
 }
+
 function LpInput({ label, value, onChange, balance, token }: {
   label: string; value: string; onChange: (v: string) => void; balance?: bigint; token: string
 }) {

@@ -93,13 +93,47 @@ export default function GameHub() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="page-title">Games</h1>
+        <h1 className="page-title">Game Registry</h1>
         <p className="text-surface-500 text-sm mt-1">
-          Registered games in the PixelVault ecosystem
+          {games.length} games connected to the shared PixelVault economy
         </p>
-        <p className="text-xs text-surface-400 mt-1">
-          Each game is a registered client of the shared protocol. Game developers call <Link to="/sdk" className="text-brand-600 hover:underline">the SDK</Link> to read/write on-chain state.
-        </p>
+      </div>
+
+      {/* Protocol Stats */}
+      {!isLoading && games.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="card px-4 py-3 text-center">
+            <p className="stat-label">Registered Games</p>
+            <p className="text-xl font-bold text-surface-900">{games.length}</p>
+          </div>
+          <div className="card px-4 py-3 text-center">
+            <p className="stat-label">Total Players</p>
+            <p className="text-xl font-bold text-surface-900">{games.reduce((a, g) => a + g.uniquePlayers, 0)}</p>
+          </div>
+          <div className="card px-4 py-3 text-center">
+            <p className="stat-label">Total Volume</p>
+            <p className="text-xl font-bold text-surface-900">{parseFloat(formatEther(games.reduce((a, g) => a + g.totalVolume, 0n))).toFixed(0)} PXL</p>
+          </div>
+          <div className="card px-4 py-3 text-center">
+            <p className="stat-label">Shared Infra</p>
+            <p className="text-xl font-bold text-surface-900">DEX · Market · Gas</p>
+          </div>
+        </div>
+      )}
+
+      {/* Cross-game economy flow */}
+      <div className="card p-5">
+        <p className="stat-label text-center mb-3">How It Works</p>
+        <div className="flex items-center justify-center gap-2 text-xs flex-wrap">
+          <span className="px-2.5 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 font-medium">Game registers</span>
+          <span className="text-surface-300">→</span>
+          <span className="px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 font-medium">Gets token + items</span>
+          <span className="text-surface-300">→</span>
+          <span className="px-2.5 py-1.5 rounded-lg bg-brand-50 border border-brand-200 text-brand-700 font-medium">DEX pool auto-created</span>
+          <span className="text-surface-300">→</span>
+          <span className="px-2.5 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-medium">Cross-game trade</span>
+        </div>
+        <p className="text-xs text-surface-400 text-center mt-2">Every game connects to the same DEX, Marketplace, Gas Paymaster, and Achievement system</p>
       </div>
 
       <div className="card p-6">
@@ -170,8 +204,8 @@ export default function GameHub() {
                   </p>
                 </div>
               </div>
-              <Link to="/sdk" className="text-sm text-brand-600 hover:text-brand-700 font-medium py-2 px-5">
-                View SDK →
+              <Link to="/how-it-works" className="text-sm text-brand-600 hover:text-brand-700 font-medium py-2 px-5">
+                Learn More →
               </Link>
             </div>
           </div>
