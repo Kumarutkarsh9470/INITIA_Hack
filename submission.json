@@ -4,7 +4,7 @@
   "description": "PixelVault is a modular gaming infrastructure protocol that gives every player a single on-chain identity (ERC-721 + ERC-6551 TBA), shared economy (AMM DEX, marketplace, gas abstraction), and cross-game asset interoperability — all on Initia MiniEVM with Cosmos-native IBC bridging. Any game developer can permissionlessly register via registerGameWithFee() and get a token, item collection, DEX pool, and gas abstraction out of the box.",
   "track": "Gaming & Consumer",
   "team": "Kumarutkarsh9470",
-  "live_url": "https://pixelvault-two.vercel.app",
+  "live_url": "https://pixelvault-v2.vercel.app",
   "github_repo": "https://github.com/Kumarutkarsh9470/INITIA_Hack",
   "demo_video_url": "",
   "native_feature": "interwoven-bridge",
@@ -15,7 +15,7 @@
     "contracts/GasPaymaster.sol"
   ],
   "deployed_address": "0x275e3111f0Bc2D85b8e8FDbF3A1157C3C868347e",
-  "commit_sha": "2d5a9e2",
+  "commit_sha": "0d39ed3",
   "chain": {
     "network": "Initia MiniEVM",
     "chain_id": "2891653883154692",
