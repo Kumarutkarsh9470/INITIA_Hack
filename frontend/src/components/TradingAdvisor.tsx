@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { formatEther } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
-import { GAME_IDS, DUNGEON_ITEMS, HARVEST_ITEMS, DUNGEON_DROP_RATES } from '../lib/constants'
+import { GAME_IDS, DUNGEON_ITEMS, HARVEST_ITEMS, COSMIC_ITEMS, DUNGEON_DROP_RATES } from '../lib/constants'
 
 const ITEM_FLOOR_COSTS_DNGN: Record<number, number> = {
   1: 10 / 0.60,
@@ -37,20 +37,27 @@ export default function TradingAdvisor() {
 
     try {
       // Fetch all on-chain data in parallel
-      const [pxl, dngn, hrv, dungeonPool, harvestPool,
+      const [pxl, dngn, hrv, race, dungeonPool, harvestPool, cosmicPool,
              sword, shield, crown, harvestItem,
-             dngnRating, hrvRating, nextListingId] = await Promise.all([
+             cosmicItem1, cosmicItem2, cosmicItem3,
+             dngnRating, hrvRating, cosmicRating, nextListingId] = await Promise.all([
         publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.dungeonDropsToken.address, abi: contracts.dungeonDropsToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.harvestFieldToken.address, abi: contracts.harvestFieldToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.cosmicRacerToken.address, abi: contracts.cosmicRacerToken.abi, functionName: 'balanceOf', args: [tba] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [GAME_IDS.DUNGEON] }) as Promise<any>,
         publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [GAME_IDS.HARVEST] }) as Promise<any>,
+        publicClient.readContract({ address: contracts.pixelVaultDEX.address, abi: contracts.pixelVaultDEX.abi, functionName: 'pools', args: [GAME_IDS.COSMIC] }) as Promise<any>,
         publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.harvestFieldAssets.address, abi: contracts.harvestFieldAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.DUNGEON] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.HARVEST] }) as Promise<bigint>,
+        publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameRating', args: [GAME_IDS.COSMIC] }) as Promise<bigint>,
         publicClient.readContract({ address: contracts.marketplace.address, abi: contracts.marketplace.abi, functionName: 'nextListingId' }) as Promise<bigint>,
       ])
 
@@ -63,14 +70,20 @@ export default function TradingAdvisor() {
       const hrvReserveGame = parseFloat(formatEther(harvestPool[2]))
       const hrvPricePxl = hrvReserveGame > 0 ? hrvReservePxl / hrvReserveGame : 0
 
+      const cosmicReservePxl = parseFloat(formatEther(cosmicPool[1]))
+      const cosmicReserveGame = parseFloat(formatEther(cosmicPool[2]))
+      const cosmicPricePxl = cosmicReserveGame > 0 ? cosmicReservePxl / cosmicReserveGame : 0
+
       // Floor prices with rating
       const dngnRatingNum = Number(dngnRating) / 100
       const hrvRatingNum = Number(hrvRating) / 100
+      const cosmicRatingNum = Number(cosmicRating) / 100
       const floorPrices: Record<string, string> = {
         'Common Sword': (ITEM_FLOOR_COSTS_DNGN[1] * dngnPricePxl * dngnRatingNum).toFixed(2),
         'Rare Shield': (ITEM_FLOOR_COSTS_DNGN[2] * dngnPricePxl * dngnRatingNum).toFixed(2),
         'Legendary Crown': (ITEM_FLOOR_COSTS_DNGN[3] * dngnPricePxl * dngnRatingNum).toFixed(2),
         'Seasonal Harvest Item': (hrvPricePxl * hrvRatingNum).toFixed(2),
+        'Speed Boost': (cosmicPricePxl * cosmicRatingNum).toFixed(2),
       }
 
       // Fetch active marketplace listings (cap at 20)
@@ -85,9 +98,15 @@ export default function TradingAdvisor() {
         }) as any
         if (l[6]) {
           const isDungeon = l[1].toLowerCase() === contracts.dungeonDropsAssets.address.toLowerCase()
+          const isHarvest = l[1].toLowerCase() === contracts.harvestFieldAssets.address.toLowerCase()
+          const isCosmic = l[1].toLowerCase() === contracts.cosmicRacerAssets.address.toLowerCase()
           const itemName = isDungeon
             ? DUNGEON_ITEMS[Number(l[2]) as keyof typeof DUNGEON_ITEMS]
-            : HARVEST_ITEMS[Number(l[2]) as keyof typeof HARVEST_ITEMS]
+            : isHarvest
+            ? HARVEST_ITEMS[Number(l[2]) as keyof typeof HARVEST_ITEMS]
+            : isCosmic
+            ? COSMIC_ITEMS[Number(l[2]) as keyof typeof COSMIC_ITEMS]
+            : undefined
           activeListings.push({
             item: itemName || `Item #${l[2]}`,
             qty: Number(l[3]),
@@ -102,21 +121,27 @@ export default function TradingAdvisor() {
           'Rare Shield': Number(shield),
           'Legendary Crown': Number(crown),
           'Seasonal Harvest Item': Number(harvestItem),
+          'Speed Boost': Number(cosmicItem1),
+          'Nitro Tank': Number(cosmicItem2),
+          'Turbo Engine': Number(cosmicItem3),
         },
         balances: {
           PXL: parseFloat(formatEther(pxl)).toFixed(2),
           DNGN: parseFloat(formatEther(dngn)).toFixed(2),
           HRV: parseFloat(formatEther(hrv)).toFixed(2),
+          RACE: parseFloat(formatEther(race)).toFixed(2),
         },
         floorPrices,
         listings: activeListings,
         ratings: {
           DungeonDrops: `${dngnRatingNum.toFixed(1)} stars`,
           HarvestField: `${hrvRatingNum.toFixed(1)} stars`,
+          CosmicRacer: `${cosmicRatingNum.toFixed(1)} stars`,
         },
         dexPrices: {
           dngnPricePxl: dngnPricePxl.toFixed(6),
           hrvPricePxl: hrvPricePxl.toFixed(6),
+          racePricePxl: cosmicPricePxl.toFixed(6),
         },
       }
 

@@ -20,7 +20,7 @@ const FEATURES = [
   },
   {
     title: 'IBC Token Bridge',
-    desc: 'Bridge PXL, DNGN, HRV tokens to Initia L1 via IBC. Tokens are registered with the Cosmos bank module.',
+    desc: 'Bridge PXL and all game tokens to Initia L1 via IBC. Tokens are registered with the Cosmos bank module.',
     icon: '🌉',
     accent: 'from-cyan-500/10 to-cyan-500/5',
     border: 'hover:border-cyan-300',

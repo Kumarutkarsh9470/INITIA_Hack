@@ -213,7 +213,7 @@ export default function HowItWorks() {
           The DEX and tokens are <em>components</em> of the infrastructure, not the product itself. 
           The product is the full pipeline: <strong>player identity → game registration → item ownership → cross-game trading → gas abstraction → achievement tracking</strong>. 
           No single game needs to build any of this — they call the SDK and get a complete economy out of the box. 
-          The demo games (Dungeon Drops, Harvest Field) prove that every primitive works end-to-end. 
+          The demo games (Dungeon Drops, Harvest Field, Cosmic Racer) prove that every primitive works end-to-end. 
           In production, the &quot;Enter Dungeon&quot; button becomes a Unity combat scene, but the on-chain operation is identical.
         </p>
       </div>
@@ -221,10 +221,10 @@ export default function HowItWorks() {
       {/* CTA */}
       <div className="card p-6 text-center">
         <p className="text-surface-500 text-sm mb-3">Try the live demo games that use these exact contract calls</p>
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link to="/dungeon" className="btn-primary text-sm py-2.5 px-6">Dungeon Drops</Link>
           <Link to="/harvest" className="btn-primary text-sm py-2.5 px-6 bg-emerald-600 hover:bg-emerald-700">Harvest Field</Link>
-          <Link to="/games" className="text-sm text-brand-600 hover:text-brand-700 font-medium px-4 py-2.5">All Games →</Link>
+          <Link to="/games" className="btn-primary text-sm py-2.5 px-6 bg-orange-600 hover:bg-orange-700">All Games →</Link>
         </div>
       </div>
     </div>

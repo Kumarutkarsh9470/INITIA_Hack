@@ -17,12 +17,13 @@ const ICosmosABI = parseAbi([
   'function to_cosmos_address(address evm_address) external view returns (string)',
 ])
 
-type BridgeToken = 'PXL' | 'DNGN' | 'HRV'
+type BridgeToken = 'PXL' | 'DNGN' | 'HRV' | 'RACE'
 
 const TOKEN_INFO: Record<BridgeToken, { label: string; desc: string }> = {
   PXL: { label: 'PXL', desc: 'Platform Token' },
   DNGN: { label: 'DNGN', desc: 'Dungeon Drops' },
   HRV: { label: 'HRV', desc: 'Harvest Field' },
+  RACE: { label: 'RACE', desc: 'Cosmic Racer' },
 }
 
 export default function Bridge() {
@@ -34,7 +35,7 @@ export default function Bridge() {
   const [selectedToken, setSelectedToken] = useState<BridgeToken>('PXL')
   const [amount, setAmount] = useState('')
   const [receiver, setReceiver] = useState('')
-  const [balances, setBalances] = useState<Record<BridgeToken, bigint>>({ PXL: 0n, DNGN: 0n, HRV: 0n })
+  const [balances, setBalances] = useState<Record<BridgeToken, bigint>>({ PXL: 0n, DNGN: 0n, HRV: 0n, RACE: 0n })
   const [cosmosAddr, setCosmosAddr] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -44,12 +45,14 @@ export default function Bridge() {
     PXL: contracts.pxlToken.address,
     DNGN: contracts.dungeonDropsToken.address,
     HRV: contracts.harvestFieldToken.address,
+    RACE: contracts.cosmicRacerToken.address,
   }
 
   const tokenAbiMap: Record<BridgeToken, any> = {
     PXL: contracts.pxlToken.abi,
     DNGN: contracts.dungeonDropsToken.abi,
     HRV: contracts.harvestFieldToken.abi,
+    RACE: contracts.cosmicRacerToken.abi,
   }
 
   // Fetch balances and cosmos address
@@ -57,12 +60,13 @@ export default function Bridge() {
     if (!tba) return
     setIsLoading(true)
     try {
-      const [pxl, dngn, hrv] = await Promise.all([
+      const [pxl, dngn, hrv, race] = await Promise.all([
         publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }),
         publicClient.readContract({ address: contracts.dungeonDropsToken.address, abi: contracts.dungeonDropsToken.abi, functionName: 'balanceOf', args: [tba] }),
         publicClient.readContract({ address: contracts.harvestFieldToken.address, abi: contracts.harvestFieldToken.abi, functionName: 'balanceOf', args: [tba] }),
+        publicClient.readContract({ address: contracts.cosmicRacerToken.address, abi: contracts.cosmicRacerToken.abi, functionName: 'balanceOf', args: [tba] }),
       ])
-      setBalances({ PXL: pxl as bigint, DNGN: dngn as bigint, HRV: hrv as bigint })
+      setBalances({ PXL: pxl as bigint, DNGN: dngn as bigint, HRV: hrv as bigint, RACE: race as bigint })
 
       // Get Cosmos address for the user's EOA (tokens bridge from here)
       try {
