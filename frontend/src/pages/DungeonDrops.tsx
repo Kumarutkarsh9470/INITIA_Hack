@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { formatEther, encodeFunctionData, decodeEventLog } from 'viem'
+import { formatEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
@@ -121,7 +121,13 @@ export default function DungeonDrops() {
 
     const calldata = encodeFunctionData({ abi: contracts.dungeonDrops.abi, functionName: 'enterDungeon', args: [] })
 
-    let receipt: any
+    // Snapshot item balances before the roll
+    const beforeBalances = await Promise.all([
+      publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }),
+      publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }),
+      publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }),
+    ]) as [bigint, bigint, bigint]
+
     if (usePaymaster) {
       const paymasterAllowance = await publicClient.readContract({
         address: contracts.dungeonDropsToken.address,
@@ -139,23 +145,25 @@ export default function DungeonDrops() {
         await execute(contracts.dungeonDropsToken.address, 0n, approvePaymaster)
       }
 
-      receipt = await executeViaPaymaster(
+      await executeViaPaymaster(
         contracts.dungeonDropsToken.address,
         GAS_COST_DNGN,
         ADDRESSES.DungeonDrops as `0x${string}`,
         calldata,
       )
     } else {
-      receipt = await execute(ADDRESSES.DungeonDrops, 0n, calldata)
+      await execute(ADDRESSES.DungeonDrops, 0n, calldata)
     }
 
-    if (receipt?.logs) {
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({ abi: contracts.dungeonDrops.abi, eventName: 'DungeonEntered', topics: log.topics, data: log.data }) as any
-          if (decoded?.args?.itemId !== undefined) return Number(decoded.args.itemId)
-        } catch {}
-      }
+    // Compare balances after the roll to detect which item was minted
+    const afterBalances = await Promise.all([
+      publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }),
+      publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }),
+      publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }),
+    ]) as [bigint, bigint, bigint]
+
+    for (let i = 0; i < 3; i++) {
+      if (afterBalances[i] > beforeBalances[i]) return i + 1
     }
     return null
   }

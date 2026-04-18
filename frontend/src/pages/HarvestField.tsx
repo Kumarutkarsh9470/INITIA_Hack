@@ -8,7 +8,7 @@ import { ADDRESSES } from '../lib/addresses'
 import { HARVEST_GAME_ID } from '../lib/constants'
 import toast from 'react-hot-toast'
 
-const BLOCKS_REQUIRED = 100n
+const BLOCKS_REQUIRED = 20n
 
 function calcReward(amount: bigint, blocksElapsed: bigint): bigint {
   if (amount === 0n || blocksElapsed <= 0n) return 0n
@@ -197,7 +197,7 @@ export default function HarvestField() {
             <span className="text-3xl">🌾</span>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Harvest Field</h1>
-              <p className="text-white/60 text-sm">Stake HRV for 100 blocks to earn rewards</p>
+              <p className="text-white/60 text-sm">Stake HRV for 20 blocks to earn rewards</p>
             </div>
           </div>
           <div className="bg-white/10 backdrop-blur rounded-xl px-4 py-2 text-right">
@@ -255,7 +255,7 @@ export default function HarvestField() {
           <div>
             <h2 className="section-title">Start Staking</h2>
             <p className="text-surface-500 text-sm mt-0.5">
-              Lock HRV for 100 blocks and earn proportional rewards.
+              Lock HRV for 20 blocks and earn proportional rewards.
               {usePaymaster && <span className="text-brand-500 ml-1">(via GasPaymaster)</span>}
             </p>
           </div>
@@ -274,14 +274,14 @@ export default function HarvestField() {
           {inputAmount && parseFloat(inputAmount) > 0 && (
             <div className="bg-surface-50 border border-surface-200 rounded-xl p-3 text-sm space-y-1">
               <p className="text-surface-500">
-                Base reward after 100 blocks:{' '}
+                Base reward after 20 blocks:{' '}
                 <span className="text-surface-900 font-semibold">
-                  {fmt(calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 100n))} HRV
+                  {fmt(calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 20n))} HRV
                 </span>
               </p>
               {harvestItemBalance > 0n && (
                 <p className="text-emerald-600 text-xs">
-                  🌾 +15% bonus → {fmt(calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 100n) + calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 100n) * 15n / 100n)} HRV
+                  🌾 +15% bonus → {fmt(calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 20n) + calcReward((() => { try { return parseEther(inputAmount) } catch { return 0n } })(), 20n) * 15n / 100n)} HRV
                 </p>
               )}
             </div>
@@ -299,7 +299,7 @@ export default function HarvestField() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="section-title">Growing…</h2>
-              <p className="text-surface-500 text-sm">Wait for 100 blocks to pass.</p>
+              <p className="text-surface-500 text-sm">Wait for 20 blocks to pass.</p>
             </div>
             <ProgressRing pct={progress} />
           </div>
@@ -317,7 +317,7 @@ export default function HarvestField() {
           <div>
             <div className="flex justify-between text-xs text-surface-500 mb-1">
               <span>Progress</span>
-              <span>{Number(blocksElapsed)} / 100</span>
+              <span>{Number(blocksElapsed)} / 20</span>
             </div>
             <div className="h-2 bg-surface-100 rounded-full overflow-hidden">
               <div className="h-full bg-brand-500 rounded-full transition-all duration-700"
@@ -343,7 +343,7 @@ export default function HarvestField() {
               <h2 className="section-title flex items-center gap-2">
                 <span className="text-emerald-600">✓</span> Ready to Harvest
               </h2>
-              <p className="text-surface-500 text-sm">100 blocks passed. Collect your rewards.</p>
+              <p className="text-surface-500 text-sm">20 blocks passed. Collect your rewards.</p>
             </div>
             <ProgressRing pct={1} />
           </div>
@@ -375,7 +375,7 @@ export default function HarvestField() {
       <div className="card p-5 text-sm text-surface-500 space-y-1.5">
         <p className="font-medium text-surface-700">How it works</p>
         <p>1. Approve & stake any amount of HRV.</p>
-        <p>2. Wait for 100 blocks (~8 min on Initia).</p>
+        <p>2. Wait for 20 blocks.</p>
         <p>3. Harvest to receive staked HRV plus rewards.</p>
         {harvestItemBalance > 0n && (
           <p className="text-emerald-600">🌾 Your Seasonal Harvest Bundle grants +15% bonus rewards!</p>

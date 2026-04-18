@@ -16,7 +16,7 @@ contract HarvestField is ERC2771Context, ReentrancyGuard {
     IERC20 public immutable hrvToken;
     IGameAssetCollection public immutable assetCollection;
     IAchievementBadge public immutable achievementBadge;
-    uint256 public constant HARVEST_DELAY = 100; // blocks
+    uint256 public constant HARVEST_DELAY = 20; // blocks
     uint256 public constant BASE_REWARD_RATE = 1e16; // reward per token per block
     uint256 public constant SEASONAL_ITEM_ID = 1;
     uint256 public constant BADGE_FIRST_HARVEST = 2;

@@ -92,18 +92,6 @@ export default function GasSettings() {
         </div>
       </div>
 
-      {/* How it works */}
-      <div className="card p-5 space-y-2">
-        <h2 className="section-title">How GasPaymaster Works</h2>
-        <div className="text-xs text-surface-500 space-y-1.5">
-          <p>1. Your TBA approves GasPaymaster to spend game tokens (one-time).</p>
-          <p>2. Game calls are routed through <code className="text-brand-600 bg-surface-100 px-1 rounded">GasPaymaster.executeWithGameToken()</code>.</p>
-          <p>3. GasPaymaster takes 5 tokens, swaps them to PXL via the DEX.</p>
-          <p>4. The original call is forwarded using ERC-2771 meta-transaction pattern.</p>
-          <p>5. Unused PXL is refunded to your TBA.</p>
-        </div>
-      </div>
-
       {/* Exchange Rates */}
       <div className="card p-5 space-y-3">
         <h2 className="section-title">Exchange Rates</h2>
