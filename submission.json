@@ -15,7 +15,7 @@
     "contracts/GasPaymaster.sol"
   ],
   "deployed_address": "0x275e3111f0Bc2D85b8e8FDbF3A1157C3C868347e",
-  "commit_sha": "0d39ed3",
+  "commit_sha": "1ac44b7",
   "chain": {
     "network": "Initia MiniEVM",
     "chain_id": "2891653883154692",
