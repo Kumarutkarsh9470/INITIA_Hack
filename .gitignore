@@ -7,3 +7,5 @@ coverage
 coverage.json
 dist
 *.backup
+.env.local
+.vercel

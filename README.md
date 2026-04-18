@@ -4,7 +4,7 @@
 
 Any game developer registers once → gets a token, item collection, DEX pool, marketplace access, gas abstraction, and achievement system. Players get a single on-chain identity (ERC-6551 TBA) that holds all their cross-game assets.
 
-**Live:** https://pixelvault-two.vercel.app  
+**Live:** https://pixelvault-v2.vercel.app  
 **Chain:** Initia MiniEVM (appchain `trying`, chain ID `2891653883154692`)  
 **EVM RPC:** `http://207.180.203.32/evm-rpc`
 
@@ -267,7 +267,7 @@ npm run dev
 
 | Service | Endpoint | Description |
 |---------|----------|-------------|
-| Frontend | https://pixelvault-two.vercel.app | Vercel auto-deploy from `main` |
+| Frontend | https://pixelvault-v2.vercel.app | Vercel auto-deploy from `main` |
 | EVM RPC | http://207.180.203.32/evm-rpc | MiniEVM JSON-RPC |
 | Cosmos RPC | http://207.180.203.32/cosmos-rpc | Tendermint RPC |
 | Cosmos REST | http://207.180.203.32/cosmos-rest | LCD REST API |
