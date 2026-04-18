@@ -17,6 +17,7 @@ const GasSettings = lazy(() => import('./pages/GasSettings'))
 const GameHub = lazy(() => import('./pages/GameHub'))
 const HowItWorks = lazy(() => import('./pages/SDKDocs'))
 const Bridge = lazy(() => import('./pages/Bridge'))
+const CosmicRacer = lazy(() => import('./pages/CosmicRacer'))
 
 function PageLoader() {
   return (
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/profile" element={<ProtectedPage><ProfileDashboard /></ProtectedPage>} />
         <Route path="/dungeon" element={<ProtectedPage><DungeonDrops /></ProtectedPage>} />
         <Route path="/harvest" element={<ProtectedPage><HarvestField /></ProtectedPage>} />
+        <Route path="/cosmic" element={<ProtectedPage><CosmicRacer /></ProtectedPage>} />
         <Route path="/dex" element={<ProtectedPage><DEX /></ProtectedPage>} />
         <Route path="/bridge" element={<ProtectedPage><Bridge /></ProtectedPage>} />
         <Route path="/marketplace" element={<ProtectedPage><Marketplace /></ProtectedPage>} />

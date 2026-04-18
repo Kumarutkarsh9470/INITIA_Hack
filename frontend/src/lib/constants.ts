@@ -50,6 +50,9 @@ export const BASE_REWARD_RATE = 10000000000000000n // 1e16
 // DungeonDrops constants
 export const DUNGEON_ENTRY_FEE = 10000000000000000000n // 10e18 = 10 DNGN
 
+// CosmicRacer constants
+export const COSMIC_ENTRY_FEE = 10000000000000000000n // 10e18 = 10 RACE
+
 // Drop rates (out of 100) — used for floor price computation
 export const DUNGEON_DROP_RATES: Record<number, number> = {
   1: 60,  // Common Sword: 60%

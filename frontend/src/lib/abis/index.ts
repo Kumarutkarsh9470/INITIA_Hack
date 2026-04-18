@@ -14,6 +14,7 @@ import ERC6551AccountABI from './ERC6551Account.json'
 import ERC6551RegistryABI from './ERC6551Registry.json'
 import BarterMarketABI from './BarterMarket.json'
 import CosmoBridgeABI from './CosmoBridge.json'
+import CosmicRacerABI from './CosmicRacer.json'
 
 export {
   PlayerProfileABI,
@@ -32,4 +33,5 @@ export {
   CosmoBridgeABI,
   ERC6551RegistryABI,
   BarterMarketABI,
+  CosmicRacerABI,
 }

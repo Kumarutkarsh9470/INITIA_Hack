@@ -18,6 +18,7 @@ import {
   ERC6551RegistryABI,
   BarterMarketABI,
   CosmoBridgeABI,
+  CosmicRacerABI,
 } from '../lib/abis'
 
 const JSON_RPC_URL = import.meta.env.VITE_JSON_RPC_URL ?? `${window.location.origin}/evm-rpc`
@@ -49,6 +50,7 @@ interface Contracts {
   harvestFieldAssets: { address: `0x${string}`; abi: typeof GameAssetCollectionABI }
   cosmicRacerToken: { address: `0x${string}`; abi: typeof GameTokenABI }
   cosmicRacerAssets: { address: `0x${string}`; abi: typeof GameAssetCollectionABI }
+  cosmicRacer: { address: `0x${string}`; abi: typeof CosmicRacerABI }
   erc6551Account: { address: `0x${string}`; abi: typeof ERC6551AccountABI }
   erc6551Registry: { address: `0x${string}`; abi: typeof ERC6551RegistryABI }
   barterMarket: { address: `0x${string}`; abi: typeof BarterMarketABI }
@@ -75,6 +77,7 @@ export function useContracts(): Contracts {
       harvestFieldAssets: { address: ADDRESSES.HarvestFieldAssets, abi: GameAssetCollectionABI },
       cosmicRacerToken: { address: ADDRESSES.CosmicRacerToken, abi: GameTokenABI },
       cosmicRacerAssets: { address: ADDRESSES.CosmicRacerAssets, abi: GameAssetCollectionABI },
+      cosmicRacer: { address: ADDRESSES.CosmicRacer, abi: CosmicRacerABI },
       erc6551Account: { address: ADDRESSES.ERC6551Account, abi: ERC6551AccountABI },
       erc6551Registry: { address: ADDRESSES.ERC6551Registry, abi: ERC6551RegistryABI },
       barterMarket: { address: (ADDRESSES.BarterMarket ?? '0x0000000000000000000000000000000000000000') as `0x${string}`, abi: BarterMarketABI },

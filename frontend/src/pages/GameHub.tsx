@@ -87,6 +87,7 @@ export default function GameHub() {
     const lowerName = name.toLowerCase()
     if (lowerName.includes('dungeon')) return '/dungeon'
     if (lowerName.includes('harvest')) return '/harvest'
+    if (lowerName.includes('cosmic')) return '/cosmic'
     return '/games'
   }
 
