@@ -29,6 +29,7 @@ function safeAddr(raw: string | undefined): `0x${string}` | null {
 const PXL_TOKEN = safeAddr(deployedAddresses.PXLToken || process.env.PXL_TOKEN_ADDRESS)
 const DNGN_TOKEN = safeAddr(deployedAddresses.DungeonDropsToken || process.env.DNGN_TOKEN_ADDRESS)
 const HRV_TOKEN = safeAddr(deployedAddresses.HarvestFieldToken || process.env.HRV_TOKEN_ADDRESS)
+const RACE_TOKEN = safeAddr(deployedAddresses.CosmicRacerToken || process.env.RACE_TOKEN_ADDRESS)
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -64,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'No deployer key configured' })
   }
 
-  if (!PXL_TOKEN || !DNGN_TOKEN || !HRV_TOKEN) {
+  if (!PXL_TOKEN || !DNGN_TOKEN || !HRV_TOKEN || !RACE_TOKEN) {
     return res.status(500).json({ error: 'Token addresses not configured' })
   }
 
@@ -111,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await send(PXL_TOKEN, parseEther('10000'))
     await send(DNGN_TOKEN, parseEther('500'))
     await send(HRV_TOKEN, parseEther('500'))
+    await send(RACE_TOKEN, parseEther('500'))
 
     return res.status(200).json({ ok: true, funded: tba })
   } catch (err: any) {

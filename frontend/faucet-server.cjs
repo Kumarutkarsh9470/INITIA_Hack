@@ -13,6 +13,7 @@
  *   PXL_TOKEN_ADDRESS   – PXLToken contract address
  *   DNGN_TOKEN_ADDRESS  – DungeonDropsToken contract address
  *   HRV_TOKEN_ADDRESS   – HarvestFieldToken contract address
+ *   RACE_TOKEN_ADDRESS  – CosmicRacerToken contract address
  *   GROK_API_KEY        – (optional) Grok AI API key for advisor
  *   PORT                – Server port (default: 3001)
  */
@@ -57,6 +58,7 @@ function safeAddr(raw) {
 const PXL_TOKEN = safeAddr(deployedAddresses.PXLToken || process.env.PXL_TOKEN_ADDRESS)
 const DNGN_TOKEN = safeAddr(deployedAddresses.DungeonDropsToken || process.env.DNGN_TOKEN_ADDRESS)
 const HRV_TOKEN = safeAddr(deployedAddresses.HarvestFieldToken || process.env.HRV_TOKEN_ADDRESS)
+const RACE_TOKEN = safeAddr(deployedAddresses.CosmicRacerToken || process.env.RACE_TOKEN_ADDRESS)
 
 const ERC20_TRANSFER_ABI = [
   {
@@ -155,7 +157,7 @@ app.post('/api/faucet', async (req, res) => {
     return res.status(500).json({ error: 'No deployer key configured' })
   }
 
-  if (!PXL_TOKEN || !DNGN_TOKEN || !HRV_TOKEN) {
+  if (!PXL_TOKEN || !DNGN_TOKEN || !HRV_TOKEN || !RACE_TOKEN) {
     return res.status(500).json({ error: 'Token addresses not configured' })
   }
 
@@ -192,6 +194,7 @@ app.post('/api/faucet', async (req, res) => {
     await send(PXL_TOKEN, parseEther('10000'))
     await send(DNGN_TOKEN, parseEther('500'))
     await send(HRV_TOKEN, parseEther('500'))
+    await send(RACE_TOKEN, parseEther('500'))
 
     return res.json({ ok: true, funded: tba })
   } catch (err) {
