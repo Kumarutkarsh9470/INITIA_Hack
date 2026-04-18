@@ -21,10 +21,8 @@ function ammEstimate(amtIn: bigint, reserveIn: bigint, reserveOut: bigint): bigi
   const amtInWithFee = amtIn * 997n
   return (amtInWithFee * reserveOut) / (reserveIn * 1000n + amtInWithFee)
 }
-
 const TOKEN_COLORS: Record<string, string> = { PXL: 'text-brand-600', DNGN: 'text-violet-600', HRV: 'text-emerald-600' }
 const SLIPPAGE_BPS = 50n
-
 export default function DEX() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
@@ -185,7 +183,6 @@ export default function DEX() {
           </div>
         ))}
       </div>
-
       {/* Tabs */}
       <div className="flex bg-surface-100 rounded-xl p-1 gap-1">
         {(['swap', 'liquidity', 'economics'] as Tab[]).map(t => (
@@ -275,7 +272,6 @@ export default function DEX() {
           </button>
         </div>
       )}
-
       {/* LIQUIDITY TAB */}
       {tab === 'liquidity' && (
         <div className="space-y-4">
@@ -290,7 +286,6 @@ export default function DEX() {
               </button>
             ))}
           </div>
-
           {/* Add */}
           <div className="card p-5 space-y-4">
             <h3 className="section-title text-sm">Add Liquidity</h3>
@@ -312,7 +307,6 @@ export default function DEX() {
               {isPending ? 'Processing…' : 'Add Liquidity'}
             </button>
           </div>
-
           {/* Remove */}
           <div className="card p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -330,7 +324,6 @@ export default function DEX() {
           </div>
         </div>
       )}
-
       {/* ECONOMICS TAB */}
       {tab === 'economics' && (
         <div className="space-y-4">
@@ -377,7 +370,6 @@ export default function DEX() {
               </div>
             </div>
           </div>
-
           {/* Cross-game flow — visual only */}
           <div className="card p-4">
             <div className="flex items-center justify-center gap-2 text-sm">
@@ -390,7 +382,6 @@ export default function DEX() {
           </div>
         </div>
       )}
-
       {/* Pool Reserves */}
       <div className="card p-5 space-y-4">
         <h2 className="section-title text-sm">Pool Reserves</h2>
@@ -422,7 +413,6 @@ export default function DEX() {
     </div>
   )
 }
-
 function LpInput({ label, value, onChange, balance, token }: {
   label: string; value: string; onChange: (v: string) => void; balance?: bigint; token: string
 }) {
