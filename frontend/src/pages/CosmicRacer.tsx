@@ -3,13 +3,12 @@ import { formatEther, encodeFunctionData, decodeEventLog } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
+import { useGasEstimate } from '../hooks/useGasEstimate'
 import { ADDRESSES } from '../lib/addresses'
-import { COSMIC_ENTRY_FEE } from '../lib/constants'
+import { COSMIC_ENTRY_FEE, COSMIC_GAME_ID } from '../lib/constants'
 import { resolveReward, TIER_THRESHOLDS, type RewardTier } from '../lib/ScoreResolver'
 import RacerGame from '../components/RacerGame'
 import toast from 'react-hot-toast'
-
-const GAS_COST_RACE = 5n * 10n ** 18n // 5 RACE per run for gas
 
 const COSMIC_ITEM_NAMES: Record<number, string> = {
   1: 'Speed Boost',
@@ -49,6 +48,7 @@ export default function CosmicRacer() {
   const { tba, refetch } = usePlayerProfile()
   const contracts = useContracts()
   const { execute, executeViaPaymaster, isPending } = useTBA()
+  const { gasCostTokens: GAS_COST_RACE, formatted: gasFeeDisplay } = useGasEstimate(COSMIC_GAME_ID)
 
   const [raceBalance, setRaceBalance] = useState(0n)
   const [totalRaces, setTotalRaces] = useState(0n)
@@ -251,7 +251,7 @@ export default function CosmicRacer() {
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <p className="stat-label">Entry Fee</p>
           <p className="text-xl font-bold text-surface-900 mt-1">10</p>
-          <p className="text-xs text-surface-400">RACE{usePaymaster ? ' + 5 gas' : ''} / roll</p>
+          <p className="text-xs text-surface-400">RACE{usePaymaster ? ` + ${gasFeeDisplay} gas` : ''} / roll</p>
         </div>
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
           <p className="stat-label">Your Races</p>
@@ -270,7 +270,7 @@ export default function CosmicRacer() {
               <p className="text-sm font-medium text-surface-700">Pay gas with RACE</p>
               <p className="text-xs text-surface-400 mt-0.5">
                 {usePaymaster
-                  ? 'GasPaymaster active — 5 RACE covers gas via ERC-2771 meta-tx'
+                  ? `Gas fee: ~${gasFeeDisplay} RACE`
                   : 'Using native GAS token for transaction fees'}
               </p>
             </div>
@@ -383,7 +383,7 @@ export default function CosmicRacer() {
                     <span className="text-surface-500">Cost per roll</span>
                     <span className="font-medium text-surface-700">
                       {parseFloat(formatEther(COSMIC_ENTRY_FEE)).toFixed(0)} RACE
-                      {usePaymaster && <span className="text-indigo-500"> + {parseFloat(formatEther(GAS_COST_RACE)).toFixed(0)} gas</span>}
+                      {usePaymaster && <span className="text-indigo-500"> + {gasFeeDisplay} gas</span>}
                     </span>
                   </div>
                   <div className="border-t border-surface-100 pt-2 flex justify-between">

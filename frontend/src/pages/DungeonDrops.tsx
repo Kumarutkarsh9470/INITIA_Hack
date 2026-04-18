@@ -3,14 +3,14 @@ import { formatEther, encodeFunctionData, decodeEventLog } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
+import { useGasEstimate } from '../hooks/useGasEstimate'
 import { ADDRESSES } from '../lib/addresses'
 import { DUNGEON_ENTRY_FEE } from '../lib/constants'
+import { DUNGEON_GAME_ID } from '../lib/constants'
 import { resolveReward, type RewardTier } from '../lib/ScoreResolver'
 import PuzzleGame from '../components/PuzzleGame'
 import RewardConfirm from '../components/RewardConfirm'
 import toast from 'react-hot-toast'
-
-const GAS_COST_DNGN = 5n * 10n ** 18n // 5 DNGN per run for gas
 
 const DUNGEON_ITEM_NAMES: Record<number, string> = {
   1: 'Common Sword',
@@ -40,6 +40,7 @@ export default function DungeonDrops() {
   const { tba, refetch } = usePlayerProfile()
   const contracts = useContracts()
   const { execute, executeViaPaymaster, isPending } = useTBA()
+  const { gasCostTokens: GAS_COST_DNGN, formatted: gasFeeDisplay } = useGasEstimate(DUNGEON_GAME_ID)
 
   const [dngnBalance, setDngnBalance] = useState(0n)
   const [totalRuns, setTotalRuns] = useState(0n)
@@ -242,7 +243,7 @@ export default function DungeonDrops() {
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <p className="stat-label">Entry Fee</p>
           <p className="text-xl font-bold text-surface-900 mt-1">10</p>
-          <p className="text-xs text-surface-400">DNGN{usePaymaster ? ' + 5 gas' : ''} / roll</p>
+          <p className="text-xs text-surface-400">DNGN{usePaymaster ? ` + ${gasFeeDisplay} gas` : ''} / roll</p>
         </div>
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
           <p className="stat-label">Your Runs</p>
@@ -261,7 +262,7 @@ export default function DungeonDrops() {
               <p className="text-sm font-medium text-surface-700">Pay gas with DNGN</p>
               <p className="text-xs text-surface-400 mt-0.5">
                 {usePaymaster
-                  ? 'GasPaymaster active — 5 DNGN covers gas via ERC-2771 meta-tx'
+                  ? `Gas fee: ~${gasFeeDisplay} DNGN`
                   : 'Using native GAS token for transaction fees'}
               </p>
             </div>

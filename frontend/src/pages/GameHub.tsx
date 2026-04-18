@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { formatEther } from 'viem'
 import { Link } from 'react-router-dom'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
@@ -21,67 +21,74 @@ export default function GameHub() {
 
   const [games, setGames] = useState<GameInfo[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const hasLoaded = useRef(false)
 
-  useEffect(() => {
+  const fetchGames = useCallback(async (silent = false) => {
     if (!tba) return
+    if (!silent) setIsLoading(true)
+    try {
+      const countRaw = await publicClient.readContract({
+        address: contracts.gameRegistry.address,
+        abi: contracts.gameRegistry.abi,
+        functionName: 'getGameCount',
+      })
+      const count = Number(countRaw)
+      const fetchedGames: GameInfo[] = []
 
-    const fetchGames = async () => {
-      setIsLoading(true)
-      try {
-        const countRaw = await publicClient.readContract({
+      for (let i = 0; i < count; i++) {
+        const gameId = (await publicClient.readContract({
           address: contracts.gameRegistry.address,
           abi: contracts.gameRegistry.abi,
-          functionName: 'getGameCount',
-        })
-        const count = Number(countRaw)
-        const fetchedGames: GameInfo[] = []
+          functionName: 'gameIds',
+          args: [BigInt(i)],
+        })) as string
 
-        for (let i = 0; i < count; i++) {
-          const gameId = (await publicClient.readContract({
-            address: contracts.gameRegistry.address,
-            abi: contracts.gameRegistry.abi,
-            functionName: 'gameIds',
-            args: [BigInt(i)],
-          })) as string
+        const gameData = (await publicClient.readContract({
+          address: contracts.gameRegistry.address,
+          abi: contracts.gameRegistry.abi,
+          functionName: 'games',
+          args: [gameId],
+        })) as any
 
-          const gameData = (await publicClient.readContract({
-            address: contracts.gameRegistry.address,
-            abi: contracts.gameRegistry.abi,
-            functionName: 'games',
-            args: [gameId],
-          })) as any
+        const ratingRaw = (await publicClient.readContract({
+          address: contracts.gameRegistry.address,
+          abi: contracts.gameRegistry.abi,
+          functionName: 'getGameRating',
+          args: [gameId],
+        })) as bigint
 
-          const ratingRaw = (await publicClient.readContract({
-            address: contracts.gameRegistry.address,
-            abi: contracts.gameRegistry.abi,
-            functionName: 'getGameRating',
-            args: [gameId],
-          })) as bigint
-
-          if (gameData[8] === true) {
-            fetchedGames.push({
-              id: gameId,
-              name: gameData[3],
-              developer: gameData[2],
-              totalVolume: gameData[5],
-              uniquePlayers: Number(gameData[6]),
-              rating: Number(ratingRaw) / 100,
-              active: gameData[8],
-            })
-          }
+        if (gameData[8] === true) {
+          fetchedGames.push({
+            id: gameId,
+            name: gameData[3],
+            developer: gameData[2],
+            totalVolume: gameData[5],
+            uniquePlayers: Number(gameData[6]),
+            rating: Number(ratingRaw) / 100,
+            active: gameData[8],
+          })
         }
-
-        setGames(fetchedGames)
-      } catch (error) {
-        console.error('Error fetching game hub data:', error)
-        toast.error('Failed to load Game Hub')
-      } finally {
-        setIsLoading(false)
       }
-    }
 
-    fetchGames()
+      setGames(fetchedGames)
+    } catch (error) {
+      console.error('Error fetching game hub data:', error)
+      if (!silent) toast.error('Failed to load Game Hub')
+    } finally {
+      setIsLoading(false)
+    }
   }, [tba, contracts])
+
+  useEffect(() => {
+    fetchGames()
+  }, [fetchGames])
+
+  // Poll every 30s for live rating & player count updates
+  useEffect(() => {
+    if (!tba) return
+    const id = setInterval(() => fetchGames(true), 30_000)
+    return () => clearInterval(id)
+  }, [tba, fetchGames])
 
   const getGameRoute = (name: string) => {
     const lowerName = name.toLowerCase()
@@ -175,11 +182,25 @@ export default function GameHub() {
                 <div className="flex items-center gap-6">
                   <div className="text-right hidden sm:block">
                     <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span key={star} className={`text-sm ${star <= game.rating ? 'text-amber-400' : 'text-surface-200'}`}>
-                          ★
-                        </span>
-                      ))}
+                      {[1, 2, 3, 4, 5].map((star) => {
+                        const filled = game.rating >= star
+                        const half = !filled && game.rating >= star - 0.5
+                        return (
+                          <span key={star} className="text-sm relative">
+                            {filled ? (
+                              <span className="text-amber-400">★</span>
+                            ) : half ? (
+                              <span className="text-surface-200">
+                                ★
+                                <span className="absolute inset-0 overflow-hidden w-[50%]"><span className="text-amber-400">★</span></span>
+                              </span>
+                            ) : (
+                              <span className="text-surface-200">★</span>
+                            )}
+                          </span>
+                        )
+                      })}
+                      <span className="text-xs text-surface-400 ml-1">{game.rating.toFixed(1)}</span>
                     </div>
                   </div>
                   <Link

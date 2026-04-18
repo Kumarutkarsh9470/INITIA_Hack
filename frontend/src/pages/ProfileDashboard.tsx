@@ -245,17 +245,6 @@ export default function ProfileDashboard() {
 
       {/* AI Trading Advisor */}
       <TradingAdvisor />
-
-      {/* Quick Nav */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <NavButton to="/dungeon" label="Dungeon Drops" />
-        <NavButton to="/harvest" label="Harvest Field" />
-        <NavButton to="/dex" label="DEX" />
-        <NavButton to="/bridge" label="IBC Bridge" />
-        <NavButton to="/marketplace" label="Marketplace" />
-        <NavButton to="/gas" label="Gas Settings" />
-        <NavButton to="/games" label="Game Hub" />
-      </div>
     </div>
   )
 }
@@ -287,10 +276,4 @@ function ItemCard({ name, count, game }: { name: string; count: bigint; game: st
   )
 }
 
-function NavButton({ to, label }: { to: string; label: string }) {
-  return (
-    <Link to={to} className="card-hover p-4 text-center">
-      <span className="text-sm font-medium text-surface-700">{label}</span>
-    </Link>
-  )
-}
+

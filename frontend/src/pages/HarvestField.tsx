@@ -3,11 +3,12 @@ import { formatEther, parseEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
+import { useGasEstimate } from '../hooks/useGasEstimate'
 import { ADDRESSES } from '../lib/addresses'
+import { HARVEST_GAME_ID } from '../lib/constants'
 import toast from 'react-hot-toast'
 
 const BLOCKS_REQUIRED = 100n
-const GAS_COST_HRV = 5n * 10n ** 18n // 5 HRV per action for gas
 
 function calcReward(amount: bigint, blocksElapsed: bigint): bigint {
   if (amount === 0n || blocksElapsed <= 0n) return 0n
@@ -45,6 +46,7 @@ export default function HarvestField() {
   const { tba } = usePlayerProfile()
   const contracts = useContracts()
   const { execute, executeViaPaymaster, isPending } = useTBA()
+  const { gasCostTokens: GAS_COST_HRV, formatted: gasFeeDisplay } = useGasEstimate(HARVEST_GAME_ID)
 
   const [hrvBalance, setHrvBalance] = useState(0n)
   const [stakedAmount, setStakedAmount] = useState(0n)
@@ -212,7 +214,7 @@ export default function HarvestField() {
             <p className="text-sm font-medium text-surface-700">Pay gas with HRV</p>
             <p className="text-xs text-surface-400 mt-0.5">
               {usePaymaster
-                ? 'GasPaymaster active — 5 HRV covers gas via ERC-2771 meta-tx'
+                ? `Gas fee: ~${gasFeeDisplay} HRV`
                 : 'Using native GAS token for transaction fees'}
             </p>
           </div>
@@ -225,7 +227,7 @@ export default function HarvestField() {
         </div>
         {insufficientForGas && (
           <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-3">
-            You need at least 5 HRV for gas fees. Toggle off to use native GAS, or get more HRV from the DEX.
+            You need at least ~{gasFeeDisplay} HRV for gas fees. Toggle off to use native GAS, or get more HRV from the DEX.
           </p>
         )}
       </div>

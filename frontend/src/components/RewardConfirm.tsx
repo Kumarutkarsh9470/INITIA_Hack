@@ -56,7 +56,7 @@ export default function RewardConfirm({ score, entryFee, dngnBalance, usePaymast
               <span className="text-surface-500">Cost per roll</span>
               <span className="font-medium text-surface-700">
                 {parseFloat(formatEther(entryFee)).toFixed(0)} DNGN
-                {usePaymaster && <span className="text-brand-500"> + {parseFloat(formatEther(gasCost)).toFixed(0)} gas</span>}
+                {usePaymaster && <span className="text-brand-500"> + {parseFloat(formatEther(gasCost)).toFixed(2)} gas</span>}
               </span>
             </div>
             <div className="border-t border-surface-100 pt-2 flex justify-between">
