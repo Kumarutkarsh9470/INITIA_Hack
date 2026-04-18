@@ -166,6 +166,7 @@ function faucetPlugin(): Plugin {
           const pxl = getAddress(addresses.PXLToken)
           const dngn = getAddress(addresses.DungeonDropsToken)
           const hrv = getAddress(addresses.HarvestFieldToken)
+          const race = getAddress(addresses.CosmicRacerToken)
 
           // Minimal ERC-20 transfer ABI
           const abi = [{ name: 'transfer', type: 'function', stateMutability: 'nonpayable', inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }], outputs: [{ name: '', type: 'bool' }] }] as const
@@ -179,18 +180,23 @@ function faucetPlugin(): Plugin {
           // Get nonce once, increment manually to avoid collisions on back-to-back sends
           let nonce = await pub.getTransactionCount({ address: account.address })
 
-          const send = async (token: `0x${string}`, amount: bigint) => {
+          const sendTx = (token: `0x${string}`, amount: bigint) => {
             const data = encodeFunctionData({ abi, functionName: 'transfer', args: [normalizedTba, amount] })
-            const hash = await client.sendTransaction({ to: token, data, chain, account, nonce })
-            nonce++
-            // Wait for receipt to confirm before next tx
-            await pub.waitForTransactionReceipt({ hash })
-            return hash
+            const currentNonce = nonce++
+            return client.sendTransaction({ to: token, data, chain, account, nonce: currentNonce })
           }
 
-          await send(pxl, parseEther('10000'))
-          await send(dngn, parseEther('500'))
-          await send(hrv, parseEther('500'))
+          // Send all transactions without waiting, then confirm in parallel
+          const hashes = await Promise.all([
+            sendTx(pxl, parseEther('10000')),
+            sendTx(dngn, parseEther('500')),
+            sendTx(hrv, parseEther('500')),
+            sendTx(race, parseEther('500')),
+          ])
+          const receipts = await Promise.all(hashes.map(hash => pub.waitForTransactionReceipt({ hash })))
+          for (const r of receipts) {
+            if (r.status === 'reverted') throw new Error(`Transfer reverted (tx: ${r.transactionHash})`)
+          }
 
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end(JSON.stringify({ ok: true, funded: tba }))

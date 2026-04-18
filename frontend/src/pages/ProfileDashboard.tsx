@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatEther } from 'viem'
 import { Link } from 'react-router-dom'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
@@ -30,77 +30,76 @@ export default function ProfileDashboard() {
   const [isClaiming, setIsClaiming] = useState(false)
   const [cosmosAddr, setCosmosAddr] = useState('')
 
-  useEffect(() => {
+  const fetchAll = useCallback(async () => {
     if (!tba) return
-
-    const fetchAll = async () => {
-      setIsLoadingData(true)
-      try {
-        // Fetch registered games
-        const countRaw = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameCount' })
-        const count = Number(countRaw)
-        const fetchedGames: RegisteredGame[] = []
-        for (let i = 0; i < count; i++) {
-          const gameId = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'gameIds', args: [BigInt(i)] }) as `0x${string}`
-          const data = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'games', args: [gameId] }) as any
-          if (data[8] === true) {
-            const game: RegisteredGame = { gameId, name: data[3], symbol: data[4], tokenAddress: data[0], assetCollection: data[1] }
-            fetchedGames.push(game)
-            registerKnownItems(game.assetCollection, game.symbol)
-          }
+    setIsLoadingData(true)
+    try {
+      // Fetch registered games
+      const countRaw = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'getGameCount' })
+      const count = Number(countRaw)
+      const fetchedGames: RegisteredGame[] = []
+      for (let i = 0; i < count; i++) {
+        const gameId = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'gameIds', args: [BigInt(i)] }) as `0x${string}`
+        const data = await publicClient.readContract({ address: contracts.gameRegistry.address, abi: contracts.gameRegistry.abi, functionName: 'games', args: [gameId] }) as any
+        if (data[8] === true) {
+          const game: RegisteredGame = { gameId, name: data[3], symbol: data[4], tokenAddress: data[0], assetCollection: data[1] }
+          fetchedGames.push(game)
+          registerKnownItems(game.assetCollection, game.symbol)
         }
-        setGames(fetchedGames)
-
-        // PXL balance
-        const pxl = await publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as bigint
-        setPxlBalance(pxl)
-
-        // Game token balances
-        const balances: Record<string, bigint> = {}
-        for (const game of fetchedGames) {
-          balances[game.symbol] = (await publicClient.readContract({ address: game.tokenAddress, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] })) as bigint
-        }
-        setTokenBalances(balances)
-
-        // Items across all games
-        const items: { name: string; count: bigint; game: string }[] = []
-        const erc1155Abi = contracts.dungeonDropsAssets.abi
-        for (const game of fetchedGames) {
-          const knownMap = KNOWN_ITEMS[game.assetCollection.toLowerCase()] ?? {}
-          const maxItem = Math.max(...Object.keys(knownMap).map(Number), 5)
-          for (let id = 1; id <= maxItem; id++) {
-            try {
-              const bal = (await publicClient.readContract({ address: game.assetCollection, abi: erc1155Abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
-              items.push({ name: knownMap[id] ?? `Item #${id}`, count: bal, game: game.name })
-            } catch { /* skip */ }
-          }
-        }
-        setAllItems(items)
-
-        // Badges
-        const b: Record<number, bigint> = {}
-        const badgeIds = Object.keys(BADGE_NAMES).map(Number)
-        for (const id of badgeIds) {
-          const bal = (await publicClient.readContract({ address: contracts.achievementBadge.address, abi: contracts.achievementBadge.abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
-          b[id] = bal
-        }
-        setBadges(b)
-
-        // Cosmos address
-        try {
-          const cosAddr = await publicClient.readContract({ address: contracts.cosmoBridge.address, abi: contracts.cosmoBridge.abi, functionName: 'getCosmosAddress', args: [tba] })
-          setCosmosAddr(cosAddr as string)
-        } catch { /* precompile not available */ }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error)
-        toast.error('Failed to load some dashboard data')
-      } finally {
-        setIsLoadingData(false)
       }
-    }
+      setGames(fetchedGames)
 
-    fetchAll()
+      // PXL balance
+      const pxl = await publicClient.readContract({ address: contracts.pxlToken.address, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] }) as bigint
+      setPxlBalance(pxl)
+
+      // Game token balances
+      const balances: Record<string, bigint> = {}
+      for (const game of fetchedGames) {
+        balances[game.symbol] = (await publicClient.readContract({ address: game.tokenAddress, abi: contracts.pxlToken.abi, functionName: 'balanceOf', args: [tba] })) as bigint
+      }
+      setTokenBalances(balances)
+
+      // Items across all games
+      const items: { name: string; count: bigint; game: string }[] = []
+      const erc1155Abi = contracts.dungeonDropsAssets.abi
+      for (const game of fetchedGames) {
+        const knownMap = KNOWN_ITEMS[game.assetCollection.toLowerCase()] ?? {}
+        const maxItem = Math.max(...Object.keys(knownMap).map(Number), 5)
+        for (let id = 1; id <= maxItem; id++) {
+          try {
+            const bal = (await publicClient.readContract({ address: game.assetCollection, abi: erc1155Abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
+            items.push({ name: knownMap[id] ?? `Item #${id}`, count: bal, game: game.name })
+          } catch { /* skip */ }
+        }
+      }
+      setAllItems(items)
+
+      // Badges
+      const b: Record<number, bigint> = {}
+      const badgeIds = Object.keys(BADGE_NAMES).map(Number)
+      for (const id of badgeIds) {
+        const bal = (await publicClient.readContract({ address: contracts.achievementBadge.address, abi: contracts.achievementBadge.abi, functionName: 'balanceOf', args: [tba, BigInt(id)] })) as bigint
+        b[id] = bal
+      }
+      setBadges(b)
+
+      // Cosmos address
+      try {
+        const cosAddr = await publicClient.readContract({ address: contracts.cosmoBridge.address, abi: contracts.cosmoBridge.abi, functionName: 'getCosmosAddress', args: [tba] })
+        setCosmosAddr(cosAddr as string)
+      } catch { /* precompile not available */ }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+      toast.error('Failed to load some dashboard data')
+    } finally {
+      setIsLoadingData(false)
+    }
   }, [tba, contracts])
+
+  useEffect(() => {
+    fetchAll()
+  }, [fetchAll])
 
   const truncate = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
 
@@ -142,7 +141,7 @@ export default function ProfileDashboard() {
         <div className="card p-5 border-brand-200 bg-brand-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-surface-900">No tokens yet?</p>
-            <p className="text-xs text-surface-500 mt-0.5">Claim free starter tokens — 10,000 PXL · 500 DNGN · 500 HRV</p>
+            <p className="text-xs text-surface-500 mt-0.5">Claim free starter tokens — 10,000 PXL · 500 DNGN · 500 HRV · 500 RACE</p>
           </div>
           <button
             onClick={async () => {
@@ -164,9 +163,10 @@ export default function ProfileDashboard() {
                 }
                 const json = await res.json()
                 if (!res.ok) throw new Error(json.error || 'Faucet failed')
-                toast.success('Starter tokens sent! Refreshing…')
-                // Wait a bit for chain confirmation then reload
-                setTimeout(() => window.location.reload(), 4000)
+                toast.success('Starter tokens sent! Updating balances…')
+                // Faucet waits for on-chain confirmation before responding,
+                // so balances are already available — just refetch
+                await fetchAll()
               } catch (err: any) {
                 const msg = err?.message || 'Failed to claim tokens'
                 toast.error(msg.length > 80 ? 'Failed to claim tokens — please try again' : msg)

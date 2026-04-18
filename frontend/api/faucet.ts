@@ -88,31 +88,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let nonce = await pub.getTransactionCount({ address: account.address })
 
-    const send = async (token: `0x${string}`, amount: bigint) => {
+    const sendTx = (token: `0x${string}`, amount: bigint) => {
       const data = encodeFunctionData({
         abi: ERC20_TRANSFER_ABI,
         functionName: 'transfer',
         args: [tba as `0x${string}`, amount],
       })
-      const hash = await client.sendTransaction({
+      const currentNonce = nonce++
+      return client.sendTransaction({
         to: token,
         data,
         chain,
         account,
-        nonce,
+        nonce: currentNonce,
       })
-      nonce++
-      const receipt = await pub.waitForTransactionReceipt({ hash })
-      if (receipt.status === 'reverted') {
-        throw new Error(`Transfer reverted for token ${token} (tx: ${hash})`)
-      }
-      return hash
     }
 
-    await send(PXL_TOKEN, parseEther('10000'))
-    await send(DNGN_TOKEN, parseEther('500'))
-    await send(HRV_TOKEN, parseEther('500'))
-    await send(RACE_TOKEN, parseEther('500'))
+    // Send all 4 transactions without waiting (sequential nonces go into same/next block)
+    const hashes = await Promise.all([
+      sendTx(PXL_TOKEN, parseEther('10000')),
+      sendTx(DNGN_TOKEN, parseEther('500')),
+      sendTx(HRV_TOKEN, parseEther('500')),
+      sendTx(RACE_TOKEN, parseEther('500')),
+    ])
+
+    // Wait for all receipts in parallel (all likely in same block)
+    const receipts = await Promise.all(
+      hashes.map(hash => pub.waitForTransactionReceipt({ hash }))
+    )
+    for (const receipt of receipts) {
+      if (receipt.status === 'reverted') {
+        throw new Error(`Transfer reverted (tx: ${receipt.transactionHash})`)
+      }
+    }
 
     return res.status(200).json({ ok: true, funded: tba })
   } catch (err: any) {
