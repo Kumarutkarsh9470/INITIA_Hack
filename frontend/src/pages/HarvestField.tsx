@@ -104,7 +104,7 @@ export default function HarvestField() {
   }, [isStaking])
 
   async function ensurePaymasterApproval() {
-    if (!usePaymaster || !tba) return
+    if (!usePaymaster || !tba || GAS_COST_HRV === 0n) return
     const paymasterAllowance = await publicClient.readContract({
       address: contracts.harvestFieldToken.address,
       abi: contracts.harvestFieldToken.abi,
@@ -122,7 +122,7 @@ export default function HarvestField() {
   }
 
   async function executeAction(target: `0x${string}`, calldata: `0x${string}`) {
-    if (usePaymaster) {
+    if (usePaymaster && GAS_COST_HRV > 0n) {
       await ensurePaymasterApproval()
       return executeViaPaymaster(
         contracts.harvestFieldToken.address,
@@ -186,7 +186,7 @@ export default function HarvestField() {
     ? estimatedReward + (estimatedReward * 15n / 100n)
     : estimatedReward
 
-  const insufficientForGas = usePaymaster && hrvBalance < GAS_COST_HRV && stakedAmount === 0n
+  const insufficientForGas = usePaymaster && GAS_COST_HRV > 0n && hrvBalance < GAS_COST_HRV && stakedAmount === 0n
 
   return (
     <div className="space-y-6 max-w-lg">

@@ -128,7 +128,7 @@ export default function DungeonDrops() {
       publicClient.readContract({ address: contracts.dungeonDropsAssets.address, abi: contracts.dungeonDropsAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }),
     ]) as [bigint, bigint, bigint]
 
-    if (usePaymaster) {
+    if (usePaymaster && GAS_COST_DNGN > 0n) {
       const paymasterAllowance = await publicClient.readContract({
         address: contracts.dungeonDropsToken.address,
         abi: contracts.dungeonDropsToken.abi,
@@ -218,7 +218,8 @@ export default function DungeonDrops() {
   }
 
   const heldItems = Object.entries(itemBalances).filter(([, bal]) => bal > 0n)
-  const totalCost = usePaymaster ? DUNGEON_ENTRY_FEE + GAS_COST_DNGN : DUNGEON_ENTRY_FEE
+  const effectivePaymaster = usePaymaster && GAS_COST_DNGN > 0n
+  const totalCost = effectivePaymaster ? DUNGEON_ENTRY_FEE + GAS_COST_DNGN : DUNGEON_ENTRY_FEE
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -251,7 +252,7 @@ export default function DungeonDrops() {
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <p className="stat-label">Entry Fee</p>
           <p className="text-xl font-bold text-surface-900 mt-1">10</p>
-          <p className="text-xs text-surface-400">DNGN{usePaymaster ? ` + ${gasFeeDisplay} gas` : ''} / roll</p>
+          <p className="text-xs text-surface-400">DNGN{effectivePaymaster ? ` + ${gasFeeDisplay} gas` : ''} / roll</p>
         </div>
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
           <p className="stat-label">Your Runs</p>

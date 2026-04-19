@@ -130,7 +130,7 @@ export default function CosmicRacer() {
     const calldata = encodeFunctionData({ abi: contracts.cosmicRacer.abi, functionName: 'race', args: [] })
 
     let receipt: any
-    if (usePaymaster) {
+    if (usePaymaster && GAS_COST_RACE > 0n) {
       const paymasterAllowance = await publicClient.readContract({
         address: contracts.cosmicRacerToken.address,
         abi: contracts.cosmicRacerToken.abi,
@@ -218,7 +218,8 @@ export default function CosmicRacer() {
   }
 
   const heldItems = Object.entries(itemBalances).filter(([, bal]) => bal > 0n)
-  const totalCost = usePaymaster ? COSMIC_ENTRY_FEE + GAS_COST_RACE : COSMIC_ENTRY_FEE
+  const effectivePaymaster = usePaymaster && GAS_COST_RACE > 0n
+  const totalCost = effectivePaymaster ? COSMIC_ENTRY_FEE + GAS_COST_RACE : COSMIC_ENTRY_FEE
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -251,7 +252,7 @@ export default function CosmicRacer() {
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <p className="stat-label">Entry Fee</p>
           <p className="text-xl font-bold text-surface-900 mt-1">10</p>
-          <p className="text-xs text-surface-400">RACE{usePaymaster ? ` + ${gasFeeDisplay} gas` : ''} / roll</p>
+          <p className="text-xs text-surface-400">RACE{effectivePaymaster ? ` + ${gasFeeDisplay} gas` : ''} / roll</p>
         </div>
         <div className="card p-4 animate-fade-in-up" style={{ animationDelay: '160ms' }}>
           <p className="stat-label">Your Races</p>
@@ -357,7 +358,7 @@ export default function CosmicRacer() {
       {/* PHASE: RESULTS — inline reward confirm (no DNGN references) */}
       {phase === 'results' && (() => {
         const tier = resolveReward(gameScore)
-        const totalCostPerRoll = usePaymaster ? COSMIC_ENTRY_FEE + GAS_COST_RACE : COSMIC_ENTRY_FEE
+        const totalCostPerRoll = effectivePaymaster ? COSMIC_ENTRY_FEE + GAS_COST_RACE : COSMIC_ENTRY_FEE
         const totalCostAll = totalCostPerRoll * BigInt(tier.rolls)
         const canAfford = raceBalance >= totalCostAll
         const icon = TIER_ICONS[tier.tier]
@@ -383,7 +384,7 @@ export default function CosmicRacer() {
                     <span className="text-surface-500">Cost per roll</span>
                     <span className="font-medium text-surface-700">
                       {parseFloat(formatEther(COSMIC_ENTRY_FEE)).toFixed(0)} RACE
-                      {usePaymaster && <span className="text-indigo-500"> + {gasFeeDisplay} gas</span>}
+                      {effectivePaymaster && <span className="text-indigo-500"> + {gasFeeDisplay} gas</span>}
                     </span>
                   </div>
                   <div className="border-t border-surface-100 pt-2 flex justify-between">
