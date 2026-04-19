@@ -23,7 +23,7 @@ async function main() {
   await harvestAssets.grantGameRole(addresses.HarvestField);
   console.log("grantGameRole -> HarvestField assets done");
 
-  // ── W1b: Grant admin roles on CosmicRacer assets to deployer ──
+  // ── W1b: Grant admin roles on CosmicRacer assets to deployer + game contract ──
   const cosmicAssets = await ethers.getContractAt(
     "GameAssetCollection",
     addresses.CosmicRacerAssets
@@ -33,6 +33,10 @@ async function main() {
   await cosmicAssets.grantGameRole(deployer.address);
   console.log("grantGameRole -> CosmicRacer assets (deployer) done");
 
+  // Grant GAME_ROLE to CosmicRacer contract so it can mint items during race()
+  await cosmicAssets.grantGameRole(addresses.CosmicRacer);
+  console.log("grantGameRole -> CosmicRacer assets (game contract) done");
+
   // ── W2: Grant ISSUER_ROLE on AchievementBadge to game contracts ──
   const badge = await ethers.getContractAt(
     "AchievementBadge",
@@ -41,7 +45,8 @@ async function main() {
   const ISSUER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("ISSUER_ROLE"));
   await badge.grantRole(ISSUER_ROLE, addresses.DungeonDrops);
   await badge.grantRole(ISSUER_ROLE, addresses.HarvestField);
-  console.log("ISSUER_ROLE granted to DungeonDrops + HarvestField");
+  await badge.grantRole(ISSUER_ROLE, addresses.CosmicRacer);
+  console.log("ISSUER_ROLE granted to DungeonDrops + HarvestField + CosmicRacer");
 
   // ── W3: Define items on DungeonDrops asset collection ──
   await dungeonAssets.defineItem(
