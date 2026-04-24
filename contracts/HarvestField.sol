@@ -21,6 +21,8 @@ contract HarvestField is ERC2771Context, ReentrancyGuard {
     uint256 public constant SEASONAL_ITEM_ID = 1;
     uint256 public constant BADGE_FIRST_HARVEST = 2;
     mapping(address => bool) private _hasHarvested;
+    uint256 public uniquePlayers;
+    mapping(address => uint256) public playerHarvestCount;
     event Staked(address indexed player, uint256 amount);
     event Harvested(address indexed player, uint256 reward, uint256 itemId);
     event Unstaked(address indexed player, uint256 amount);
@@ -72,9 +74,13 @@ contract HarvestField is ERC2771Context, ReentrancyGuard {
         // Mint seasonal item
         assetCollection.mintItem(playerTBA, SEASONAL_ITEM_ID, 1);
 
-        // First harvest badge
+        // Track harvest count for all players
+        playerHarvestCount[playerTBA]++;
+
+        // First harvest badge + unique player tracking
         if (!_hasHarvested[playerTBA]) {
             _hasHarvested[playerTBA] = true;
+            uniquePlayers++;
             achievementBadge.issueBadge(playerTBA, BADGE_FIRST_HARVEST);
         }
 

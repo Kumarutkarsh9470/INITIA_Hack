@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { formatEther, encodeFunctionData, decodeEventLog } from 'viem'
+import { formatEther, encodeFunctionData } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
 import { useTBA } from '../hooks/useTBA'
@@ -129,6 +129,13 @@ export default function CosmicRacer() {
 
     const calldata = encodeFunctionData({ abi: contracts.cosmicRacer.abi, functionName: 'race', args: [] })
 
+    // Snapshot item balances before the race
+    const [pre1, pre2, pre3] = await Promise.all([
+      publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }) as Promise<bigint>,
+      publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }) as Promise<bigint>,
+      publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }) as Promise<bigint>,
+    ])
+
     let receipt: any
     if (usePaymaster && GAS_COST_RACE > 0n) {
       const paymasterAllowance = await publicClient.readContract({
@@ -157,14 +164,15 @@ export default function CosmicRacer() {
       receipt = await execute(ADDRESSES.CosmicRacer, 0n, calldata)
     }
 
-    if (receipt?.logs) {
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({ abi: contracts.cosmicRacer.abi, eventName: 'RaceCompleted', topics: log.topics, data: log.data }) as any
-          if (decoded?.args?.itemId !== undefined) return Number(decoded.args.itemId)
-        } catch {}
-      }
-    }
+    // Detect which item was minted via balance diff
+    const [post1, post2, post3] = await Promise.all([
+      publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 1n] }) as Promise<bigint>,
+      publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 2n] }) as Promise<bigint>,
+      publicClient.readContract({ address: contracts.cosmicRacerAssets.address, abi: contracts.cosmicRacerAssets.abi, functionName: 'balanceOf', args: [tba, 3n] }) as Promise<bigint>,
+    ])
+    if (post1 > pre1) return 1
+    if (post2 > pre2) return 2
+    if (post3 > pre3) return 3
     return null
   }
 

@@ -27,6 +27,8 @@ contract CosmicRacer is ERC2771Context, ReentrancyGuard {
     mapping(address => uint256) public playerNonce;
     mapping(address => uint256) public bestDistance;
     uint256 public totalRaces;
+    uint256 public uniquePlayers;
+    mapping(address => bool) private _hasPlayed;
 
     event RaceCompleted(address indexed player, uint256 itemId, uint256 distance, uint256 roll);
 
@@ -69,6 +71,12 @@ contract CosmicRacer is ERC2771Context, ReentrancyGuard {
         // Mint item to player
         assetCollection.mintItem(playerTBA, itemId, 1);
         totalRaces++;
+
+        // Track unique players
+        if (!_hasPlayed[playerTBA]) {
+            _hasPlayed[playerTBA] = true;
+            uniquePlayers++;
+        }
 
         // First race badge
         if (playerNonce[playerTBA] == 1) {

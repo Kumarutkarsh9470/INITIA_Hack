@@ -7,7 +7,7 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 type SwapDirection = 'pxlToGame' | 'gameToPxl'
-type Tab = 'swap' | 'liquidity' | 'economics'
+type Tab = 'swap' | 'liquidity'
 interface PoolInfo { reservePXL: bigint; reserveGame: bigint; price: bigint }
 interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}`; assetCollection: `0x${string}` }
 
@@ -185,11 +185,11 @@ export default function DEX() {
 
       {/* Tabs */}
       <div className="flex bg-surface-100 rounded-xl p-1 gap-1">
-        {(['swap', 'liquidity', 'economics'] as Tab[]).map(t => (
+        {(['swap', 'liquidity'] as Tab[]).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium capitalize transition-colors
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all
               ${tab === t ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700'}`}>
-            {t === 'swap' ? 'Swap' : t === 'liquidity' ? 'Liquidity' : 'Economics'}
+            {t === 'swap' ? 'Swap' : 'Liquidity'}
           </button>
         ))}
       </div>
@@ -311,38 +311,6 @@ export default function DEX() {
               {isPending ? 'Processing…' : 'Remove Liquidity'}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* ECONOMICS TAB */}
-      {tab === 'economics' && (
-        <div className="space-y-4">
-          <div className="card p-4">
-            <p className="stat-label text-center mb-3">Cross-Game Token Flow</p>
-            <div className="flex items-center justify-center gap-2 text-sm flex-wrap">
-              {games.map((g, i) => (
-                <div key={g.symbol} className="flex items-center gap-2">
-                  <span className={`px-3 py-1.5 rounded-lg border border-surface-200 font-medium ${TOKEN_COLORS[g.symbol] ?? 'text-surface-700'}`}>{g.symbol}</span>
-                  {i < games.length - 1 && (
-                    <>
-                      <span className="text-surface-300">↔</span>
-                      <span className="px-2 py-1 rounded-lg border border-surface-200 font-bold text-brand-600 text-xs">PXL</span>
-                      <span className="text-surface-300">↔</span>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-surface-400 text-center mt-2">Every game token routes through PXL — enabling cross-game value transfer</p>
-          </div>
-          {games.map(g => (
-            <div key={g.symbol} className="card p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-surface-700">{g.name} ({g.symbol})</span>
-                <span className="text-xs text-surface-400">Rating: {(Number(ratings[g.symbol] ?? 100n) / 100).toFixed(1)}★</span>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 

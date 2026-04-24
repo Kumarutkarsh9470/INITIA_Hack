@@ -70,6 +70,19 @@ export default function GameHub() {
         }
       }
 
+      // Patch uniquePlayers for CosmicRacer and HarvestField from the game contracts directly
+      // (GameRegistry only counts DEX swappers; game contracts now track actual players)
+      try {
+        const [cosmicUnique, harvestUnique] = await Promise.all([
+          publicClient.readContract({ address: contracts.cosmicRacer.address, abi: contracts.cosmicRacer.abi, functionName: 'uniquePlayers' }) as Promise<bigint>,
+          publicClient.readContract({ address: contracts.harvestField.address, abi: contracts.harvestField.abi, functionName: 'uniquePlayers' }) as Promise<bigint>,
+        ])
+        for (const g of fetchedGames) {
+          if (g.name === 'CosmicRacer') g.uniquePlayers = Number(cosmicUnique)
+          if (g.name === 'HarvestField') g.uniquePlayers = Number(harvestUnique)
+        }
+      } catch { /* ignore if contracts not available */ }
+
       setGames(fetchedGames)
     } catch (error) {
       console.error('Error fetching game hub data:', error)

@@ -29,6 +29,9 @@ export default function ProfileDashboard() {
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isClaiming, setIsClaiming] = useState(false)
   const [cosmosAddr, setCosmosAddr] = useState('')
+  const [dungeonNonce, setDungeonNonce] = useState(0n)
+  const [cosmicNonce, setCosmicNonce] = useState(0n)
+  const [harvestCount, setHarvestCount] = useState(0n)
 
   const fetchAll = useCallback(async () => {
     if (!tba) return
@@ -89,6 +92,18 @@ export default function ProfileDashboard() {
         const cosAddr = await publicClient.readContract({ address: contracts.cosmoBridge.address, abi: contracts.cosmoBridge.abi, functionName: 'getCosmosAddress', args: [tba] })
         setCosmosAddr(cosAddr as string)
       } catch { /* precompile not available */ }
+
+      // Per-game play counts for frontend-computed badges
+      try {
+        const [dNonce, cNonce, hCount] = await Promise.all([
+          publicClient.readContract({ address: contracts.dungeonDrops.address, abi: contracts.dungeonDrops.abi, functionName: 'playerNonce', args: [tba] }) as Promise<bigint>,
+          publicClient.readContract({ address: contracts.cosmicRacer.address, abi: contracts.cosmicRacer.abi, functionName: 'playerNonce', args: [tba] }) as Promise<bigint>,
+          publicClient.readContract({ address: contracts.harvestField.address, abi: contracts.harvestField.abi, functionName: 'playerHarvestCount', args: [tba] }) as Promise<bigint>,
+        ])
+        setDungeonNonce(dNonce)
+        setCosmicNonce(cNonce)
+        setHarvestCount(hCount)
+      } catch { /* ignore if not available */ }
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
       toast.error('Failed to load some dashboard data')
@@ -105,6 +120,10 @@ export default function ProfileDashboard() {
 
   const totalTokenValue = parseFloat(formatEther(pxlBalance)) + Object.values(tokenBalances).reduce((a, b) => a + parseFloat(formatEther(b)), 0)
   const totalItems = allItems.reduce((a, b) => a + Number(b.count), 0)
+  const isLegendaryPlayer = allItems.some(it => (it.name === 'Legendary Crown' || it.name === 'Turbo Engine') && it.count > 0n)
+  const totalPlays = Number(dungeonNonce) + Number(cosmicNonce) + Number(harvestCount)
+  const isDedicatedPlayer = totalPlays >= 7
+  const totalBadges = Object.values(badges).filter(b => b > 0n).length + (isLegendaryPlayer ? 1 : 0) + (isDedicatedPlayer ? 1 : 0)
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -127,7 +146,7 @@ export default function ProfileDashboard() {
           { label: 'Total Tokens', value: totalTokenValue.toFixed(2) },
           { label: 'Reputation', value: reputation.toString() },
           { label: 'Items Owned', value: totalItems.toString() },
-          { label: 'Badges Earned', value: Object.values(badges).filter(b => b > 0n).length.toString() },
+          { label: 'Badges Earned', value: totalBadges.toString() },
         ].map((stat, i) => (
           <div key={stat.label} className="card p-5 animate-fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
             <p className="stat-label">{stat.label}</p>
@@ -269,6 +288,18 @@ export default function ProfileDashboard() {
                 </div>
               )
             })}
+            {/* Legendary Player — frontend computed: own any item ID 3 across games */}
+            <div className={`px-4 py-2.5 rounded-xl border text-sm font-medium ${
+              isLegendaryPlayer ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-surface-50 border-surface-200 text-surface-400'
+            }`}>
+              {isLegendaryPlayer ? '★ ' : '☆ '}Legendary Player
+            </div>
+            {/* Dedicated Player — frontend computed: 7+ total plays across all games */}
+            <div className={`px-4 py-2.5 rounded-xl border text-sm font-medium ${
+              isDedicatedPlayer ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-surface-50 border-surface-200 text-surface-400'
+            }`}>
+              {isDedicatedPlayer ? '★ ' : '☆ '}Dedicated Player
+            </div>
           </div>
         )}
       </div>
