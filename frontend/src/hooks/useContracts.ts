@@ -16,7 +16,6 @@ import {
   GameAssetCollectionABI,
   ERC6551AccountABI,
   ERC6551RegistryABI,
-  BarterMarketABI,
   CosmoBridgeABI,
   CosmicRacerABI,
 } from '../lib/abis'
@@ -53,7 +52,6 @@ interface Contracts {
   cosmicRacer: { address: `0x${string}`; abi: typeof CosmicRacerABI }
   erc6551Account: { address: `0x${string}`; abi: typeof ERC6551AccountABI }
   erc6551Registry: { address: `0x${string}`; abi: typeof ERC6551RegistryABI }
-  barterMarket: { address: `0x${string}`; abi: typeof BarterMarketABI }
   cosmoBridge: { address: `0x${string}`; abi: typeof CosmoBridgeABI }
 }
 
@@ -80,7 +78,6 @@ export function useContracts(): Contracts {
       cosmicRacer: { address: ADDRESSES.CosmicRacer, abi: CosmicRacerABI },
       erc6551Account: { address: ADDRESSES.ERC6551Account, abi: ERC6551AccountABI },
       erc6551Registry: { address: ADDRESSES.ERC6551Registry, abi: ERC6551RegistryABI },
-      barterMarket: { address: (ADDRESSES.BarterMarket ?? '0x0000000000000000000000000000000000000000') as `0x${string}`, abi: BarterMarketABI },
       cosmoBridge: { address: ADDRESSES.CosmoBridge, abi: CosmoBridgeABI },
     }),
     [],
