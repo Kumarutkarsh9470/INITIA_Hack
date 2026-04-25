@@ -247,15 +247,17 @@ export default function Bridge() {
               <button
                 key={tk}
                 onClick={() => setSelectedToken(tk)}
-                className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                className={`p-3 rounded-xl border text-sm font-medium transition-all min-w-0 ${
                   selectedToken === tk
                     ? 'border-surface-900 bg-surface-900 text-white'
                     : 'border-surface-200 bg-surface-50 text-surface-700 hover:bg-surface-100'
                 }`}
               >
-                <span className="block font-semibold">{TOKEN_INFO[tk].label}</span>
-                <span className={`block text-xs mt-0.5 ${selectedToken === tk ? 'text-surface-300' : 'text-surface-400'}`}>
-                  {isLoading ? '...' : fmt(balances[tk])}
+                <span className="flex items-baseline justify-center gap-1.5 min-w-0 whitespace-nowrap">
+                  <span className="font-semibold shrink-0">{TOKEN_INFO[tk].label}</span>
+                  <span className={`text-xs tabular-nums min-w-0 max-w-[4.75rem] truncate ${selectedToken === tk ? 'text-surface-300' : 'text-surface-400'}`}>
+                    {isLoading ? '...' : fmt(balances[tk])}
+                  </span>
                 </span>
               </button>
             ))}

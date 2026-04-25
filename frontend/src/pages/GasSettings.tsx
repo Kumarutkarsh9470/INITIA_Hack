@@ -16,6 +16,12 @@ export default function GasSettings() {
   const [gasHistory, setGasHistory] = useState<GasRecord[]>([])
   const [rates, setRates] = useState<Record<string, bigint>>({})
 
+  const fmtAmount = (value: bigint, maxDecimals = 4) => {
+    const n = Number(formatEther(value))
+    if (!Number.isFinite(n)) return formatEther(value)
+    return n.toLocaleString(undefined, { maximumFractionDigits: maxDecimals })
+  }
+
   useEffect(() => {
     if (!tba) return
     const fetchData = async () => {
@@ -97,9 +103,12 @@ export default function GasSettings() {
         <h2 className="section-title">Exchange Rates</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {games.map(g => (
-            <div key={g.symbol} className="bg-surface-50 rounded-xl p-3 border border-surface-100">
+            <div key={g.symbol} className="bg-surface-50 rounded-xl p-3 border border-surface-100 min-w-0">
               <p className="stat-label mb-1">1 PXL costs</p>
-              <p className="font-bold text-surface-700">{rates[g.symbol] && rates[g.symbol] > 0n ? formatEther(rates[g.symbol]) : '—'} {g.symbol}</p>
+              <p className="font-bold text-surface-700 flex items-baseline gap-1 min-w-0 whitespace-nowrap">
+                <span className="tabular-nums truncate">{rates[g.symbol] && rates[g.symbol] > 0n ? fmtAmount(rates[g.symbol]) : '—'}</span>
+                <span className="text-xs font-semibold text-surface-600 shrink-0">{g.symbol}</span>
+              </p>
             </div>
           ))}
         </div>
@@ -130,9 +139,12 @@ export default function GasSettings() {
                   </p>
                   <p className="text-xs text-surface-400 mt-0.5 font-mono">{record.txHash.slice(0, 10)}…{record.txHash.slice(-6)}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-brand-600">{formatEther(record.tokensProvided)} {record.tokenName}</p>
-                  <p className="text-xs text-surface-400">≈ {formatEther(record.pxlEquivalent)} PXL</p>
+                <div className="text-right min-w-0 max-w-[45%]">
+                  <p className="text-sm font-semibold text-brand-600 flex items-baseline justify-end gap-1 min-w-0 whitespace-nowrap">
+                    <span className="tabular-nums truncate">{fmtAmount(record.tokensProvided)}</span>
+                    <span className="text-xs font-semibold shrink-0">{record.tokenName}</span>
+                  </p>
+                  <p className="text-xs text-surface-400 truncate">≈ {fmtAmount(record.pxlEquivalent)} PXL</p>
                 </div>
               </div>
             ))}
