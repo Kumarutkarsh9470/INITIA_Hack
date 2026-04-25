@@ -15,7 +15,7 @@
     "contracts/GasPaymaster.sol"
   ],
   "deployed_address": "0x275e3111f0Bc2D85b8e8FDbF3A1157C3C868347e",
-  "commit_sha": "1ac44b7",
+  "commit_sha": "06016aa",
   "chain": {
     "network": "Initia MiniEVM",
     "chain_id": "2891653883154692",
@@ -44,7 +44,8 @@
     "CosmicRacerToken": "0x9742fCa39c7e321C8A08DFA20FEDAC9950f039b9",
     "CosmicRacerAssets": "0x15F225Fb5D4f911322902ba3fd423247B051e31f",
     "DungeonDrops": "0x0E2A8E09A67a6AAd1414b8Dea88Ac18bea8969A7",
-    "HarvestField": "0x47Da7b1742F001Ba9Bac82b3c98880875874681E"
+    "HarvestField": "0xF31fDDbd4AD3B03A96DA8F3623FC11887c06c1E7",
+    "CosmicRacer": "0x91fF95783834cEE1020e2764c83498C2009F786f"
   },
   "features": [
     "ERC-721 player NFT + ERC-6551 Token Bound Account",
