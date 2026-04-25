@@ -9,7 +9,9 @@
     { "source": "/cosmos-rpc/(.*)", "destination": "http://207.180.203.32/cosmos-rpc/$1" },
     { "source": "/cosmos-rest", "destination": "http://207.180.203.32/cosmos-rest" },
     { "source": "/cosmos-rest/(.*)", "destination": "http://207.180.203.32/cosmos-rest/$1" },
-    { "source": "/api/(.*)", "destination": "http://207.180.203.32/api/$1" },
+    { "source": "/api/faucet", "destination": "http://207.180.203.32/api/faucet" },
+    { "source": "/api/fund-gas", "destination": "http://207.180.203.32/api/fund-gas" },
+    { "source": "/api/advisor", "destination": "http://207.180.203.32/api/advisor" },
     { "source": "/((?!api/|evm-rpc|cosmos-rpc|cosmos-rest).*)", "destination": "/index.html" }
   ],
   "headers": [
