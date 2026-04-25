@@ -12,7 +12,7 @@ dotenvConfig({ path: path.resolve(__dirname, '..', '.env') })
  * Vite plugin: in-process faucet API.
  *
  * POST /api/faucet  { "tba": "0x..." }
- *   → Sends 10 000 PXL + 500 DNGN + 500 HRV from the deployer to the TBA.
+ *   → Sends 10 000 PXL + 500 DNGN + 500 HRV + 500 RACE from the deployer to the TBA.
  *
  * POST /api/fund-gas  { "address": "0x..." }
  *   → Sends a small amount of native GAS so new accounts can exist on-chain
@@ -26,7 +26,7 @@ function faucetPlugin(): Plugin {
       // If no PRIVATE_KEY, proxy /api/* to production Vercel (for contributors)
       const pk = process.env.VITE_DEPLOYER_PRIVATE_KEY || process.env.PRIVATE_KEY
       if (!pk) {
-        const VERCEL_URL = process.env.VERCEL_URL || 'https://pixelvault-two.vercel.app'
+        const VERCEL_URL = process.env.VERCEL_URL || 'https://pixelvault-v2.vercel.app'
         console.log(`[faucet] No PRIVATE_KEY found — proxying /api/* to ${VERCEL_URL}`)
         for (const route of ['/api/fund-gas', '/api/faucet']) {
           server.middlewares.use(route, async (req, res) => {

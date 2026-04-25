@@ -58,7 +58,7 @@ const ARCH_STEPS = [
 ]
 
 const STATS = [
-  { label: 'Contracts', value: '19' },
+  { label: 'Contracts', value: '20' },
   { label: 'Game Tokens', value: '3+' },
   { label: 'Token Standards', value: '4' },
   { label: 'Chain', value: 'MiniEVM' },
@@ -233,10 +233,10 @@ export default function Landing() {
             <div className="bg-gradient-to-br from-orange-600 to-red-600 p-8 text-center">
               <span className="text-5xl block mb-3">🏎️</span>
               <h3 className="text-white font-bold text-xl">Cosmic Racer</h3>
-              <p className="text-white/60 text-sm mt-1">Racing game (3rd-party demo)</p>
+              <p className="text-white/60 text-sm mt-1">Lane-dodge racing game</p>
             </div>
             <div className="p-5 bg-white">
-              <p className="text-surface-500 text-sm">Registered via <code className="text-xs bg-surface-100 px-1 rounded">registerGameWithFee()</code> — proving permissionless onboarding.</p>
+              <p className="text-surface-500 text-sm">Race through asteroid fields to earn RACE tokens and loot drops. Registered via <code className="text-xs bg-surface-100 px-1 rounded">registerGameWithFee()</code> — demonstrating permissionless game onboarding.</p>
             </div>
           </div>
         </div>
@@ -245,7 +245,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-surface-200 py-8 text-center">
         <p className="text-surface-400 text-xs">PixelVault — Built for Initia Hackathon</p>
-        <p className="text-surface-300 text-[10px] mt-1">19 smart contracts · MiniEVM · IBC · ERC-6551 · Permissionless game registration</p>
+        <p className="text-surface-300 text-[10px] mt-1">20 smart contracts · MiniEVM · IBC · ERC-6551 · Permissionless game registration</p>
       </footer>
     </div>
   )
