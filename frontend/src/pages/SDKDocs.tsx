@@ -112,7 +112,7 @@ export default function HowItWorks() {
         </p>
       </div>
 
-      {/* Architecture */
+      {/* Architecture */}
       <div className="card p-6">
         <h2 className="section-title mb-4">Architecture Stack</h2>
         <div className="space-y-2">
