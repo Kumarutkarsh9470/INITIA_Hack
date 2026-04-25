@@ -93,18 +93,7 @@ const ARCHITECTURE_LAYERS = [
   { name: 'Initia MiniEVM', desc: 'Cosmos precompiles + IBC channels to L1', color: 'bg-amber-50 border-amber-200 text-amber-700' },
 ]
 
-const CONTRACTS_TABLE = [
-  { contract: 'PlayerProfile', role: 'ERC-721 identity NFT → creates TBA on mint', usage: 'One-time player onboarding' },
-  { contract: 'ERC6551 TBA', role: 'Smart contract wallet per player', usage: 'Holds all tokens, items, badges' },
-  { contract: 'GameRegistry', role: 'Registers games, deploys tokens + items (auto-registers with ERC20Registry)', usage: 'Game developer setup' },
-  { contract: 'GameToken', role: 'ERC-20 game-specific currency (Cosmos bank registered)', usage: 'In-game economy (earn/spend)' },
-  { contract: 'GameAssetCollection', role: 'ERC-1155 item collection', usage: 'Loot, equipment, resources' },
-  { contract: 'PixelVaultDEX', role: 'Constant-product AMM', usage: 'Cross-game token exchange' },
-  { contract: 'CosmoBridge', role: 'IBC token + NFT bridge to L1', usage: 'Bridge assets to Initia L1' },
-  { contract: 'Marketplace', role: 'P2P item trading', usage: 'Buy/sell items across games' },
-  { contract: 'AchievementBadge', role: 'Soulbound badges + reputation', usage: 'On-chain achievements' },
-  { contract: 'GasPaymaster', role: 'Meta-tx relayer (ERC-2771)', usage: 'Pay gas with game tokens' },
-]
+
 
 export default function HowItWorks() {
   return (
@@ -123,18 +112,7 @@ export default function HowItWorks() {
         </p>
       </div>
 
-      {/* Key insight callout */}
-      <div className="card p-6 border-l-4 border-l-brand-500 bg-brand-50/30">
-        <p className="text-sm font-semibold text-surface-900 mb-1">How to think about PixelVault</p>
-        <p className="text-sm text-surface-600 leading-relaxed">
-          The smart contracts are the <strong>database</strong>. The DEX and Marketplace are <strong>shared infrastructure</strong>. 
-          Each game is a <strong>client</strong> that reads and writes to this shared state. 
-          When a Unity game calls <code className="text-xs bg-surface-100 px-1.5 py-0.5 rounded">assetCollection.mintItem()</code>, 
-          it&apos;s the same on-chain operation as clicking &quot;Enter Dungeon&quot; in our demo — just wrapped in a combat animation instead of a button.
-        </p>
-      </div>
-
-      {/* Architecture */}
+      {/* Architecture */
       <div className="card p-6">
         <h2 className="section-title mb-4">Architecture Stack</h2>
         <div className="space-y-2">
@@ -178,31 +156,6 @@ export default function HowItWorks() {
               </div>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Contract Reference */}
-      <div className="card p-6">
-        <h2 className="section-title mb-4">Contract Reference</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left border-b border-surface-200">
-                <th className="pb-3 font-semibold text-surface-900 pr-4">Contract</th>
-                <th className="pb-3 font-semibold text-surface-900 pr-4">Role</th>
-                <th className="pb-3 font-semibold text-surface-900">Game Usage</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100">
-              {CONTRACTS_TABLE.map((row) => (
-                <tr key={row.contract}>
-                  <td className="py-3 pr-4 font-medium text-surface-900 font-mono text-xs">{row.contract}</td>
-                  <td className="py-3 pr-4 text-surface-600">{row.role}</td>
-                  <td className="py-3 text-surface-500">{row.usage}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
 
