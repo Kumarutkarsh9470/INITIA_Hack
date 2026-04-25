@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { formatEther, parseAbiItem } from 'viem'
 import { usePlayerProfile } from '../hooks/usePlayerProfile'
 import { useContracts, publicClient } from '../hooks/useContracts'
+import { COSMIC_ENTRY_FEE, DUNGEON_ENTRY_FEE } from '../lib/constants'
 import toast from 'react-hot-toast'
 
 interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}` }
 
 type GasRecord = {
   txHash: string
+  blockNumber: bigint
   targetName: string
   tokenName: string
   tokensProvided: bigint
@@ -72,21 +74,71 @@ export default function GasSettings() {
         setRates(newRates)
 
         // Gas history
-        const logs = await publicClient.getLogs({
-          address: contracts.gasPaymaster.address,
-          event: parseAbiItem('event GasSponsored(address indexed playerTBA, address indexed gameToken, uint256 tokensProvided, uint256 pxlReceived, address target, bool success)'),
-          args: { playerTBA: tba as `0x${string}` },
-          fromBlock: 0n,
-        })
-        const records: GasRecord[] = logs.map((log: any) => ({
-          txHash: log.transactionHash,
-          targetName: (log.args.target as string)?.slice(0, 10) + '…',
-          tokenName: tokenMap.get(log.args.gameToken?.toLowerCase()) ?? 'Unknown',
-          tokensProvided: log.args.tokensProvided ?? 0n,
-          pxlEquivalent: log.args.pxlReceived ?? 0n,
-          success: log.args.success ?? false,
-        }))
-        const reversed = records.reverse()
+        const currentBlock = await publicClient.getBlockNumber()
+        const fromBlock = currentBlock > 300000n ? currentBlock - 300000n : 0n
+
+        const [paymasterLogs, dungeonLogs, racerLogs] = await Promise.all([
+          publicClient.getLogs({
+            address: contracts.gasPaymaster.address,
+            event: parseAbiItem('event GasSponsored(address indexed playerTBA, address indexed gameToken, uint256 tokensProvided, uint256 pxlReceived, address target, bool success)'),
+            args: { playerTBA: tba as `0x${string}` },
+            fromBlock,
+          }).catch(() => []),
+          publicClient.getLogs({
+            address: contracts.dungeonDrops.address,
+            event: parseAbiItem('event DungeonEntered(address indexed player, uint256 itemId, uint256 roll)'),
+            args: { player: tba as `0x${string}` },
+            fromBlock,
+          }).catch(() => []),
+          publicClient.getLogs({
+            address: contracts.cosmicRacer.address,
+            event: parseAbiItem('event RaceCompleted(address indexed player, uint256 itemId, uint256 distance, uint256 roll)'),
+            args: { player: tba as `0x${string}` },
+            fromBlock,
+          }).catch(() => []),
+        ])
+
+        const byTxHash = new Map<string, GasRecord>()
+
+        for (const log of paymasterLogs as any[]) {
+          byTxHash.set(log.transactionHash, {
+            txHash: log.transactionHash,
+            blockNumber: log.blockNumber ?? 0n,
+            targetName: (log.args.target as string)?.slice(0, 10) + '…',
+            tokenName: tokenMap.get(log.args.gameToken?.toLowerCase()) ?? 'Unknown',
+            tokensProvided: log.args.tokensProvided ?? 0n,
+            pxlEquivalent: log.args.pxlReceived ?? 0n,
+            success: log.args.success ?? false,
+          })
+        }
+
+        for (const log of dungeonLogs as any[]) {
+          if (byTxHash.has(log.transactionHash)) continue
+          byTxHash.set(log.transactionHash, {
+            txHash: log.transactionHash,
+            blockNumber: log.blockNumber ?? 0n,
+            targetName: 'DungeonDrops',
+            tokenName: 'DNGN',
+            tokensProvided: DUNGEON_ENTRY_FEE,
+            pxlEquivalent: 0n,
+            success: true,
+          })
+        }
+
+        for (const log of racerLogs as any[]) {
+          if (byTxHash.has(log.transactionHash)) continue
+          byTxHash.set(log.transactionHash, {
+            txHash: log.transactionHash,
+            blockNumber: log.blockNumber ?? 0n,
+            targetName: 'CosmicRacer',
+            tokenName: 'RACE',
+            tokensProvided: COSMIC_ENTRY_FEE,
+            pxlEquivalent: 0n,
+            success: true,
+          })
+        }
+
+        const reversed = Array.from(byTxHash.values()).sort((a, b) => Number(b.blockNumber - a.blockNumber))
         const withFees = await Promise.all(
           reversed.map(async (record) => {
             const fee = await resolveCosmosFee(record.txHash)
