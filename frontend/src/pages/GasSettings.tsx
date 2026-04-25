@@ -6,7 +6,16 @@ import toast from 'react-hot-toast'
 
 interface RegisteredGame { gameId: `0x${string}`; name: string; symbol: string; tokenAddress: `0x${string}` }
 
-type GasRecord = { txHash: string; targetName: string; tokenName: string; tokensProvided: bigint; pxlEquivalent: bigint; success: boolean }
+type GasRecord = {
+  txHash: string
+  targetName: string
+  tokenName: string
+  tokensProvided: bigint
+  pxlEquivalent: bigint
+  success: boolean
+  gasFeeAmount?: string
+  gasFeeDenom?: string
+}
 
 export default function GasSettings() {
   const { tba } = usePlayerProfile()
@@ -20,6 +29,18 @@ export default function GasSettings() {
     const n = Number(formatEther(value))
     if (!Number.isFinite(n)) return formatEther(value)
     return n.toLocaleString(undefined, { maximumFractionDigits: maxDecimals })
+  }
+
+  const resolveCosmosFee = async (txHash: string): Promise<{ amount: string; denom: string } | null> => {
+    try {
+      const response = await fetch(`/api/gas-fee?txHash=${encodeURIComponent(txHash)}`)
+      if (!response.ok) return null
+      const data = await response.json()
+      if (!data?.ok || !data?.fee?.amount || !data?.fee?.denom) return null
+      return { amount: String(data.fee.amount), denom: String(data.fee.denom) }
+    } catch {
+      return null
+    }
   }
 
   useEffect(() => {
@@ -65,7 +86,15 @@ export default function GasSettings() {
           pxlEquivalent: log.args.pxlReceived ?? 0n,
           success: log.args.success ?? false,
         }))
-        setGasHistory(records.reverse())
+        const reversed = records.reverse()
+        const withFees = await Promise.all(
+          reversed.map(async (record) => {
+            const fee = await resolveCosmosFee(record.txHash)
+            if (!fee) return record
+            return { ...record, gasFeeAmount: fee.amount, gasFeeDenom: fee.denom }
+          })
+        )
+        setGasHistory(withFees)
       } catch (error) {
         console.error('Error fetching gas data:', error)
         toast.error('Failed to load gas data')
@@ -144,7 +173,9 @@ export default function GasSettings() {
                     <span className="tabular-nums truncate">{fmtAmount(record.tokensProvided)}</span>
                     <span className="text-xs font-semibold shrink-0">{record.tokenName}</span>
                   </p>
-                  <p className="text-xs text-surface-400 truncate">≈ {fmtAmount(record.pxlEquivalent)} PXL</p>
+                  <p className="text-xs text-surface-400 truncate">
+                    Fee: {record.gasFeeAmount && record.gasFeeDenom ? `${record.gasFeeAmount} ${record.gasFeeDenom}` : '—'}
+                  </p>
                 </div>
               </div>
             ))}

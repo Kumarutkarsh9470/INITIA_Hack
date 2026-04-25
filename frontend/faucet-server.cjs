@@ -6,6 +6,7 @@
  *   POST /api/faucet    – Send ERC-20 game tokens to a TBA
  *   POST /api/fund-gas  – Send native GAS to a new EVM address
  *   POST /api/advisor   – AI/rule-based trading advisor
+ *   GET /api/gas-fee     – Resolve Cosmos-layer fee by EVM tx hash
  *
  * Env vars:
  *   PRIVATE_KEY         – Deployer private key (0x-prefixed)
@@ -36,6 +37,7 @@ app.use(express.json())
 
 const PORT = process.env.PORT || 3001
 const RPC_URL = process.env.EVM_RPC_URL || 'http://127.0.0.1:8545'
+const COSMOS_REST_URL = (process.env.COSMOS_REST_URL || 'http://127.0.0.1:1317').replace(/\/$/, '')
 
 // Read addresses from deployed-addresses.json (auto-synced by deploy script)
 const fs = require('fs')
@@ -92,6 +94,58 @@ async function getChainConfig() {
 // ── Health check ──
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'pixelvault-api' })
+})
+
+// ── Cosmos Fee Resolver (GAS denom only) ──
+app.get('/api/gas-fee', async (req, res) => {
+  const rawTxHash = String(req.query?.txHash || '').trim()
+  if (!rawTxHash || !/^0x[0-9a-fA-F]{64}$/.test(rawTxHash)) {
+    return res.status(400).json({ error: 'Provide txHash as 0x-prefixed 32-byte hash' })
+  }
+
+  const txHash = rawTxHash.slice(2).toUpperCase()
+  const url = `${COSMOS_REST_URL}/cosmos/tx/v1beta1/txs/${txHash}`
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      return res.status(response.status).json({
+        ok: false,
+        txHash: rawTxHash,
+        error: `Cosmos tx lookup failed (${response.status})`,
+        details: text?.slice(0, 300),
+      })
+    }
+
+    const data = await response.json()
+    const amounts = data?.tx?.auth_info?.fee?.amount
+    const firstCoin = Array.isArray(amounts) && amounts.length > 0 ? amounts[0] : null
+
+    if (!firstCoin?.amount || !firstCoin?.denom) {
+      return res.json({ ok: true, txHash: rawTxHash, fee: null })
+    }
+
+    return res.json({
+      ok: true,
+      txHash: rawTxHash,
+      fee: {
+        amount: String(firstCoin.amount),
+        denom: String(firstCoin.denom),
+      },
+    })
+  } catch (err) {
+    console.error('Gas-fee resolver error:', err)
+    return res.status(502).json({
+      ok: false,
+      txHash: rawTxHash,
+      error: err?.message || 'Resolver failed',
+    })
+  }
 })
 
 // ── Fund Gas ──
