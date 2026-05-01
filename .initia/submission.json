@@ -23,5 +23,5 @@
   "native_feature": "ERC-6551 Token Bound Accounts for player asset ownership, session keys via InterwovenKit, and meta-transaction gas abstraction via GasPaymaster (ERC-2771 forwarding with on-chain DEX swap)",
   "core_logic_path": "contracts/",
   "native_feature_frontend_path": "frontend/src/",
-  "demo_video_url": ""
+  "demo_video_url": "https://www.youtube.com/watch?v=fIzwlwyTMAQ"
 }
